@@ -21,6 +21,9 @@
 #include "SimpleServer.hpp"
 #include "Projection.hpp"
 
+#include <sys/time.h>
+#include <pthread.h>
+
 #define BANNER_VERSION 1
 #define BANNER_SIZE 24
 
@@ -203,6 +206,68 @@ signal_handler(int signum) {
   }
 }
 
+static int pthread_flag = 1;
+static pthread_cond_t cond;
+static pthread_mutex_t mutex;
+static pthread_mutex_t restmutex;
+static int rotation = 0;
+
+static Minicap::DisplayInfo realInfo;
+static Minicap::DisplayInfo desiredInfo;
+static Minicap* minicap;
+static int isreset = 0;
+
+static void *thread_func(void *vptr_args)
+{
+    pthread_mutex_lock(&mutex);
+    do{
+
+      Minicap::DisplayInfo info;
+      minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
+      
+      switch (info.orientation) {
+        case Minicap::ORIENTATION_0:
+          rotation = 0;
+          break;
+        case Minicap::ORIENTATION_90:
+          rotation = 90;
+          break;
+        case Minicap::ORIENTATION_180:
+          rotation = 180;
+          break;
+        case Minicap::ORIENTATION_270:
+          rotation = 270;
+          break;
+      }
+
+      if (desiredInfo.orientation != info.orientation) {
+        pthread_mutex_lock(&restmutex);
+        
+        realInfo.width = info.width;
+        realInfo.height = info.height;
+        desiredInfo.width = info.width;
+        desiredInfo.height = info.height;
+        desiredInfo.orientation = info.orientation;
+        
+        minicap->setRealInfo(realInfo);
+        minicap->setDesiredInfo(desiredInfo);
+        std::cerr << "new w:" << desiredInfo.width << ",h:" << desiredInfo.height << ",r:" << rotation << std::endl;
+
+        minicap->applyConfigChanges();
+        isreset = 1;
+        pthread_mutex_unlock(&restmutex);
+      }
+
+      timeval delay;
+      delay.tv_sec = 0;
+      delay.tv_usec = 300 * 1000; // 300 ms
+      select(0, NULL, NULL, NULL, &delay);
+
+    } while(pthread_flag);
+
+    pthread_mutex_unlock(&mutex);
+}
+
 int
 main(int argc, char* argv[]) {
   const char* pname = argv[0];
@@ -297,6 +362,7 @@ main(int argc, char* argv[]) {
     std::cout.precision(2);
     std::cout.setf(std::ios_base::fixed, std::ios_base::floatfield);
 
+    
     std::cout << "{"                                         << std::endl
               << "    \"id\": "       << displayId    << "," << std::endl
               << "    \"width\": "    << info.width   << "," << std::endl
@@ -321,26 +387,32 @@ main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
+  std::cerr << " ===============Quaty================" << std::endl;
   std::cerr << "PID: " << getpid() << std::endl;
   std::cerr << "INFO: Using projection " << proj << std::endl;
+
+
 
   // Disable STDOUT buffering.
   setbuf(stdout, NULL);
 
+  Minicap::DisplayInfo calcinfo;
+  if (minicap_try_get_display_info(displayId, &calcinfo) != 0) {
+    return EXIT_FAILURE;
+  }
+
   // Set real display size.
-  Minicap::DisplayInfo realInfo;
-  realInfo.width = proj.realWidth;
-  realInfo.height = proj.realHeight;
+  realInfo.width = calcinfo.width;
+  realInfo.height = calcinfo.height;
 
   // Figure out desired display size.
-  Minicap::DisplayInfo desiredInfo;
-  desiredInfo.width = proj.virtualWidth;
-  desiredInfo.height = proj.virtualHeight;
-  desiredInfo.orientation = proj.rotation;
+  desiredInfo.width = calcinfo.width;
+  desiredInfo.height = calcinfo.height;
+  desiredInfo.orientation = calcinfo.orientation;
 
   // Leave a 4-byte padding to the encoder so that we can inject the size
   // to the same buffer.
-  JpgEncoder encoder(4, 0);
+  JpgEncoder encoder(8, 0);
   Minicap::Frame frame;
   bool haveFrame = false;
 
@@ -348,7 +420,7 @@ main(int argc, char* argv[]) {
   SimpleServer server;
 
   // Set up minicap.
-  Minicap* minicap = minicap_create(displayId);
+  minicap = minicap_create(displayId);
   if (minicap == NULL) {
     return EXIT_FAILURE;
   }
@@ -443,6 +515,13 @@ main(int argc, char* argv[]) {
   banner[22] = (unsigned char) desiredInfo.orientation;
   banner[23] = quirks;
 
+  // =======================================================
+  pthread_t thread;
+  if (pthread_create(&thread, NULL, thread_func, NULL) != 0){
+      return EXIT_FAILURE;
+  }
+  // ======================================================
+
   int fd;
   while (!gWaiter.isStopped() && (fd = server.accept()) > 0) {
     MCINFO("New client connection");
@@ -454,6 +533,9 @@ main(int argc, char* argv[]) {
 
     int pending, err;
     while (!gWaiter.isStopped() && (pending = gWaiter.waitForFrame()) > 0) {
+      
+      pthread_mutex_lock(&restmutex);
+
       if (skipFrames && pending > 1) {
         // Skip frames if we have too many. Not particularly thread safe,
         // but this loop should be the only consumer anyway (i.e. nothing
@@ -477,7 +559,13 @@ main(int argc, char* argv[]) {
       }
 
       if ((err = minicap->consumePendingFrame(&frame)) != 0) {
-        if (err == -EINTR) {
+        if(err == -22){
+            MCINFO(" -22  ");
+            minicap->releaseConsumedFrame(&frame);
+            pthread_mutex_unlock(&restmutex);
+            continue;
+        }
+        else if (err == -EINTR) {
           MCINFO("Frame consumption interrupted by EINTR");
           goto close;
         }
@@ -497,12 +585,13 @@ main(int argc, char* argv[]) {
 
       // Push it out synchronously because it's fast and we don't care
       // about other clients.
-      unsigned char* data = encoder.getEncodedData() - 4;
+      unsigned char* data = encoder.getEncodedData() - 8;
       size_t size = encoder.getEncodedSize();
 
-      putUInt32LE(data, size);
+      putUInt32LE(data, rotation);
+      putUInt32LE(data + 4, size);
 
-      if (pumps(fd, data, size + 4) < 0) {
+      if (pumps(fd, data, size + 8) < 0) {
         break;
       }
 
@@ -510,7 +599,9 @@ main(int argc, char* argv[]) {
       // to do it here or the loop will stop.
       minicap->releaseConsumedFrame(&frame);
       haveFrame = false;
-    }
+
+      pthread_mutex_unlock(&restmutex);
+  }
 
 close:
     MCINFO("Closing client connection");

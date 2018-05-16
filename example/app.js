@@ -16,17 +16,19 @@ wss.on('connection', function(ws) {
   console.info('Got a client')
 
   var stream = net.connect({
-    port: 1717
+    port: 1313
   })
 
   stream.on('error', function() {
-    console.error('Be sure to run `adb forward tcp:1717 localabstract:minicap`')
+    console.error('Be sure to run `adb forward tcp:1313 localabstract:minicap`')
     process.exit(1)
   })
 
   var readBannerBytes = 0
   var bannerLength = 2
   var readFrameBytes = 0
+  var readRotationBytes = 0
+  var readRotation = 0
   var frameBodyLength = 0
   var frameBody = new Buffer(0)
   var banner = {
@@ -43,7 +45,7 @@ wss.on('connection', function(ws) {
 
   function tryRead() {
     for (var chunk; (chunk = stream.read());) {
-      console.info('chunk(length=%d)', chunk.length)
+      // console.info('chunk(length=%d)', chunk.length)
       for (var cursor = 0, len = chunk.length; cursor < len;) {
         if (readBannerBytes < bannerLength) {
           switch (readBannerBytes) {
@@ -112,15 +114,25 @@ wss.on('connection', function(ws) {
             console.log('banner', banner)
           }
         }
+        else if (readRotationBytes < 4) {
+          readRotation += (chunk[cursor] << (readRotationBytes * 8)) >>> 0
+          cursor += 1
+          readRotationBytes += 1
+
+          if (readRotationBytes == 4) {
+            console.info('readRotation:%d', readRotation)
+          }
+          
+        }
         else if (readFrameBytes < 4) {
           frameBodyLength += (chunk[cursor] << (readFrameBytes * 8)) >>> 0
           cursor += 1
           readFrameBytes += 1
-          console.info('headerbyte%d(val=%d)', readFrameBytes, frameBodyLength)
+          // console.info('headerbyte%d(val=%d)', readFrameBytes, frameBodyLength)
         }
         else {
           if (len - cursor >= frameBodyLength) {
-            console.info('bodyfin(len=%d,cursor=%d)', frameBodyLength, cursor)
+            // console.info('bodyfin(len=%d,cursor=%d)', frameBodyLength, cursor)
 
             frameBody = Buffer.concat([
               frameBody
@@ -139,11 +151,11 @@ wss.on('connection', function(ws) {
             })
 
             cursor += frameBodyLength
-            frameBodyLength = readFrameBytes = 0
+            frameBodyLength = readFrameBytes = readRotationBytes = readRotation = 0
             frameBody = new Buffer(0)
           }
           else {
-            console.info('body(len=%d)', len - cursor)
+            // console.info('body(len=%d)', len - cursor)
 
             frameBody = Buffer.concat([
               frameBody

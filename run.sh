@@ -1,7 +1,6 @@
 #!/bin/sh
-
-set -exo pipefail
-ndk-build.cmd NDK_DEBUG=0 1>&2
+# set -exo pipefail
+ndk-build.cmd -j4 NDK_DEBUG=0 1>&2
 
 abi=$(adb shell getprop ro.product.cpu.abi | tr -d '\r')
 sdk=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
@@ -27,7 +26,11 @@ fi
 size=$(adb shell dumpsys window | grep -Eo 'init=[0-9]+x[0-9]+' | head -1 | cut -d= -f 2)
 args="-P $size@$size/0"
 echo mobilesize: $args
-adb shell chmod +x $dir/minicap
+adb shell chmod 777 $dir/minicap
 adb shell LD_LIBRARY_PATH=$dir $dir/minicap $args "$@"
+
+c=`adb shell 'ps | grep minicap'`
+pid=`echo $c | awk '{print $2}'`
+adb shell kill ${pid}
 
 adb shell rm -r $dir

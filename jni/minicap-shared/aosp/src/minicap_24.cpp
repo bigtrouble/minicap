@@ -104,6 +104,7 @@ public:
 
   virtual int
   applyConfigChanges() {
+    MCINFO("applyConfigChanges");
     if (mHaveRunningDisplay) {
       destroyVirtualDisplay();
     }
@@ -150,6 +151,7 @@ public:
 
   virtual void
   release() {
+    MCINFO("release");
     destroyVirtualDisplay();
   }
 

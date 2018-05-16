@@ -120,7 +120,7 @@ wss.on('connection', function(ws) {
           readRotationBytes += 1
 
           if (readRotationBytes == 4) {
-            console.info('readRotation:%d', readRotation)
+            // console.info('readRotation:%d', readRotation)
           }
           
         }

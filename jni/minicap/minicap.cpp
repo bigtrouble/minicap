@@ -398,6 +398,7 @@ main(int argc, char* argv[]) {
 
   Minicap::DisplayInfo calcinfo;
   if (minicap_try_get_display_info(displayId, &calcinfo) != 0) {
+    std::cerr << "ERR: minicap_try_get_display_info failed " << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -409,6 +410,7 @@ main(int argc, char* argv[]) {
   desiredInfo.width = calcinfo.width;
   desiredInfo.height = calcinfo.height;
   desiredInfo.orientation = calcinfo.orientation;
+
 
   // Leave a 4-byte padding to the encoder so that we can inject the size
   // to the same buffer.

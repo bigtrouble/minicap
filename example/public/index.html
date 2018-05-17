@@ -57,6 +57,7 @@ var app = new Vue({
       detecting: false,
       isstopCanvas: false,
       img: new Image(),
+      toching: false
     }
   },
   mounted () {
@@ -91,14 +92,18 @@ var app = new Vue({
     onMouseDown({x,y}) {
       let msg = JSON.stringify({ type: 'mousedown', x,y });
       this.ws.send(msg);
+      this.toching = true;
     },
     onMouseUp({x,y}) {
       let msg = JSON.stringify({ type: 'mouseup', x,y });
       this.ws.send(msg);
+      this.toching = false;
     },
     onMouseMove({x,y}){
-      let msg = JSON.stringify({ type: 'mousemove', x,y });
-      this.ws.send(msg);
+      if(this.toching) {
+        let msg = JSON.stringify({ type: 'mousemove', x,y });
+        this.ws.send(msg);
+      }
     },
     stopCanvas () {
       this.isstopCanvas = !this.isstopCanvas

@@ -61,7 +61,7 @@ var app = new Vue({
     }
   },
   mounted () {
-    this.ws = new WebSocket('ws://localhost:9002', 'minicap')
+    this.ws = new WebSocket('ws://'+location.hostname+':9002', 'minicap')
     this.ws.binaryType = 'blob'
     this.ws.onmessage = this.onmessage
     this.ws.onopen = () => {

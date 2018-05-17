@@ -333,6 +333,11 @@ main(int argc, char* argv[]) {
   proj.realHeight = calcinfo.height;
   proj.rotation = preRotation;
 
+  state.realWidth = calcinfo.width;
+  state.realHeight = calcinfo.height;
+  state.virtualWidth = proj.virtualWidth;
+  state.virtualHeight = proj.virtualHeight;
+
 
   proj.forceMaximumSize();
   // proj.forceAspectRatio();

@@ -49,7 +49,13 @@ typedef struct
   int tracking_id;
   contact_t contacts[MAX_SUPPORTED_CONTACTS];
   int active_contacts;
+
+  //--------------------------------------------
   FILE* input;
+  int realWidth;
+  int realHeight;
+  int virtualWidth;
+  int virtualHeight;
 } internal_state_t;
 
 static int is_character_device(const char* devpath)
@@ -615,6 +621,14 @@ static int start_server(char* sockname)
   return fd;
 }
 
+
+static int calcRealX(internal_state_t* state, int virtualX) {
+  return round(state->realWidth * 1.0 / state->virtualWidth * virtualX);
+}
+static int calcRealY(internal_state_t* state, int virtualY) {
+  return round(state->realHeight * 1.0 / state->virtualHeight * virtualY);
+}
+
 static void parse_input(char* buffer, internal_state_t* state)
 {
   char* cursor;
@@ -622,7 +636,7 @@ static void parse_input(char* buffer, internal_state_t* state)
 
   cursor = (char*) buffer;
   cursor += 1;
-  
+
   switch (buffer[0])
   {
     case 'c': // COMMIT
@@ -632,18 +646,23 @@ static void parse_input(char* buffer, internal_state_t* state)
       touch_panic_reset_all(state);
       break;
     case 'd': // TOUCH DOWN
-      contact = strtol(cursor, &cursor, 10);
-      x = strtol(cursor, &cursor, 10);
-      y = strtol(cursor, &cursor, 10);
-      pressure = strtol(cursor, &cursor, 10);
-      touch_down(state, contact, x, y, pressure);
+      {
+        contact = strtol(cursor, &cursor, 10);
+        x = strtol(cursor, &cursor, 10);
+        y = strtol(cursor, &cursor, 10);
+        pressure = strtol(cursor, &cursor, 10);
+        int tx = calcRealX(state,x);
+        int ty = calcRealY(state,y);
+        fprintf(stderr, "Tx: %d,%d ms\n", tx,ty);
+        touch_down(state, contact, tx, ty, pressure);
+      }
       break;
     case 'm': // TOUCH MOVE
       contact = strtol(cursor, &cursor, 10);
       x = strtol(cursor, &cursor, 10);
       y = strtol(cursor, &cursor, 10);
       pressure = strtol(cursor, &cursor, 10);
-      touch_move(state, contact, x, y, pressure);
+      touch_move(state, contact, calcRealX(state,x), calcRealY(state,y), pressure);
       break;
     case 'u': // TOUCH UP
       contact = strtol(cursor, &cursor, 10);

@@ -12,8 +12,11 @@
 <div>
   <div style='position:relative'>
     <div>
-      <canvas ref="canvas" style="position:absolute; left:5px;top:5px; max-width: calc(100vw - 400px);max-height: calc(100vh - 10px);outline: 1px solid white;"></canvas>
-      <canvas ref="detcanvas" style="position:absolute; left:5px;top:5px; width: calc(100vw - 400px);max-height: calc(100vh - 10px);;"></canvas>
+      <canvas ref="canvas" style="position:absolute; left:5px;top:5px; outline: 1px solid white;"></canvas>
+      <canvas ref="detcanvas" style="position:absolute; left:5px;top:5px;"
+        @mousedown="onMouseDown"
+        @mouseup="onMouseUp"
+      ></canvas>
     </div>
 
     <div style='float:right;margin-right:20px;margin-top:5px;'>
@@ -70,6 +73,12 @@ var app = new Vue({
       this.canvas.height = this.img.height
       this.detcanvas.width = this.img.width
       this.detcanvas.height = this.img.height
+
+      this.canvas.style.width = this.img.width +'px'
+      this.canvas.style.height = this.img.height +'px'
+      this.detcanvas.style.width = this.img.width +'px'
+      this.detcanvas.style.height = this.img.height +'px'
+
       this.g.drawImage(this.img,0,0);
       this.detectDetect();
     }
@@ -78,6 +87,16 @@ var app = new Vue({
     });
   },
   methods: {
+    onMouseDown({x,y}) {
+      let msg = JSON.stringify({ type: 'mousedown', x,y });
+      console.log(msg)
+      this.ws.send(msg);
+    },
+    onMouseUp({x,y}) {
+      let msg = JSON.stringify({ type: 'mouseup', x,y });
+      console.log(msg)
+      this.ws.send(msg);
+    },
     stopCanvas () {
       this.isstopCanvas = !this.isstopCanvas
     },

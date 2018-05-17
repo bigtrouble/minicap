@@ -13,7 +13,23 @@ var server = http.createServer(app)
 var wss = new WebSocketServer({ server: server })
 
 wss.on('connection', function(ws) {
-  console.info('Got a client')
+  
+  ws.on('message', function(msg) {
+    let e = JSON.parse(msg);
+    switch(e.type) {
+      case 'mousedown':
+        let msg = `d 0 50 ${e.x} ${e.y}\n`;
+        stream.write(msg)
+        stream.write(`c\n`)
+        break;
+      case 'mouseup':
+        stream.write(`u 0\n`)
+        stream.write(`c\n`)
+        break;
+      default:
+        console.log('unknow msg:', e)
+    }
+  })
 
   var stream = net.connect({
     port: 1313

@@ -16,6 +16,7 @@
       <canvas ref="detcanvas" style="position:absolute; left:5px;top:5px;"
         @mousedown="onMouseDown"
         @mouseup="onMouseUp"
+        @mousemove="onMouseMove"
       ></canvas>
     </div>
 
@@ -89,12 +90,14 @@ var app = new Vue({
   methods: {
     onMouseDown({x,y}) {
       let msg = JSON.stringify({ type: 'mousedown', x,y });
-      console.log(msg)
       this.ws.send(msg);
     },
     onMouseUp({x,y}) {
       let msg = JSON.stringify({ type: 'mouseup', x,y });
-      console.log(msg)
+      this.ws.send(msg);
+    },
+    onMouseMove({x,y}){
+      let msg = JSON.stringify({ type: 'mousemove', x,y });
       this.ws.send(msg);
     },
     stopCanvas () {

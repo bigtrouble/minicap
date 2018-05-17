@@ -26,6 +26,12 @@ wss.on('connection', function(ws) {
         stream.write(`u 0\n`)
         stream.write(`c\n`)
         break;
+      case 'mousemove':
+        let msg = `m 0 ${e.x} ${e.y} 50\n`;
+        stream.write(msg)
+        stream.write(`c\n`)
+        break;
+
       default:
         console.log('unknow msg:', e)
     }

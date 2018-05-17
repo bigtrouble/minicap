@@ -24,6 +24,8 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+#include <minitouch.c>
+
 #define BANNER_VERSION 1
 #define BANNER_SIZE 24
 
@@ -43,12 +45,11 @@ usage(const char* pname) {
     "Usage: %s [-h] [-n <name>]\n"
     "  -d <id>:       Display ID. (%d)\n"
     "  -n <name>:     Change the name of the abtract unix domain socket. (%s)\n"
-    "  -P <value>:    Display projection (<w>x<h>@<w>x<h>/{0|90|180|270}).\n"
+    "  -P <value>:    Display projection (<w>x<h>).\n"
     "  -Q <value>:    JPEG quality (0-100).\n"
     "  -s:            Take a screenshot and output it to stdout. Needs -P.\n"
     "  -S:            Skip frames when they cannot be consumed quickly enough.\n"
     "  -t:            Attempt to get the capture method running, then exit.\n"
-    "  -i:            Get display information in JSON format. May segfault.\n"
     "  -h:            Show help.\n",
     pname, DEFAULT_DISPLAY_ID, DEFAULT_SOCKET_NAME
   );
@@ -247,11 +248,12 @@ main(int argc, char* argv[]) {
   const char* sockname = DEFAULT_SOCKET_NAME;
   uint32_t displayId = DEFAULT_DISPLAY_ID;
   unsigned int quality = DEFAULT_JPG_QUALITY;
-  bool showInfo = false;
   bool takeScreenshot = false;
   bool skipFrames = false;
-  bool testOnly = false;
   Projection proj;
+
+  //minitouch
+  internal_state_t state = {0};
 
   int opt;
   while ((opt = getopt(argc, argv, "d:n:P:Q:siSth")) != -1) {
@@ -265,7 +267,7 @@ main(int argc, char* argv[]) {
     case 'P': {
       Projection::Parser parser;
       if (!parser.parse(proj, optarg, optarg + strlen(optarg))) {
-        std::cerr << "ERROR: invalid format for -P, need <w>x<h>@<w>x<h>/{0|90|180|270}" << std::endl;
+        std::cerr << "ERROR: invalid format for -P, need <virtual-width>x<virtual-height>" << std::endl;
         return EXIT_FAILURE;
       }
       break;
@@ -276,14 +278,8 @@ main(int argc, char* argv[]) {
     case 's':
       takeScreenshot = true;
       break;
-    case 'i':
-      showInfo = true;
-      break;
     case 'S':
       skipFrames = true;
-      break;
-    case 't':
-      testOnly = true;
       break;
     case 'h':
       usage(pname);
@@ -306,68 +302,7 @@ main(int argc, char* argv[]) {
   // Start Android's thread pool so that it will be able to serve our requests.
   minicap_start_thread_pool();
 
-  if (showInfo) {
-    Minicap::DisplayInfo info;
 
-    if (minicap_try_get_display_info(displayId, &info) != 0) {
-      if (try_get_framebuffer_display_info(displayId, &info) != 0) {
-        MCERROR("Unable to get display info");
-        return EXIT_FAILURE;
-      }
-    }
-
-    int rotation;
-    switch (info.orientation) {
-    case Minicap::ORIENTATION_0:
-      rotation = 0;
-      break;
-    case Minicap::ORIENTATION_90:
-      rotation = 90;
-      break;
-    case Minicap::ORIENTATION_180:
-      rotation = 180;
-      break;
-    case Minicap::ORIENTATION_270:
-      rotation = 270;
-      break;
-    }
-
-    std::cout.precision(2);
-    std::cout.setf(std::ios_base::fixed, std::ios_base::floatfield);
-
-    
-    std::cout << "{"                                         << std::endl
-              << "    \"id\": "       << displayId    << "," << std::endl
-              << "    \"width\": "    << info.width   << "," << std::endl
-              << "    \"height\": "   << info.height  << "," << std::endl
-              << "    \"xdpi\": "     << info.xdpi    << "," << std::endl
-              << "    \"ydpi\": "     << info.ydpi    << "," << std::endl
-              << "    \"size\": "     << info.size    << "," << std::endl
-              << "    \"density\": "  << info.density << "," << std::endl
-              << "    \"fps\": "      << info.fps     << "," << std::endl
-              << "    \"secure\": "   << (info.secure ? "true" : "false") << "," << std::endl
-              << "    \"rotation\": " << rotation            << std::endl
-              << "}"                                         << std::endl;
-
-    return EXIT_SUCCESS;
-  }
-
-  proj.forceMaximumSize();
-  proj.forceAspectRatio();
-
-  if (!proj.valid()) {
-    std::cerr << "ERROR: missing or invalid -P" << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  std::cerr << " ===============Quaty================" << std::endl;
-  std::cerr << "PID: " << getpid() << std::endl;
-  std::cerr << "INFO: Using projection " << proj << std::endl;
-
-
-
-  // Disable STDOUT buffering.
-  setbuf(stdout, NULL);
 
   Minicap::DisplayInfo calcinfo;
   if (minicap_try_get_display_info(displayId, &calcinfo) != 0) {
@@ -375,8 +310,8 @@ main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-
-  int preRotation = 0;
+  
+  uint32_t preRotation = 0;
   switch (calcinfo.orientation) {
     case Minicap::ORIENTATION_0:
       preRotation = 0;
@@ -391,14 +326,31 @@ main(int argc, char* argv[]) {
       preRotation = 270;
       break;
     }
-
   // Set real display size.
   realInfo.width = calcinfo.width;
+  proj.realWidth = calcinfo.width;
   realInfo.height = calcinfo.height;
+  proj.realHeight = calcinfo.height;
+  proj.rotation = preRotation;
+
+
+  proj.forceMaximumSize();
+  // proj.forceAspectRatio();
+  std::cerr << "INFO: Using projection " << proj << std::endl;
+  if (!proj.valid()) {
+    std::cerr << "ERROR: missing or invalid -P" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  std::cerr << " ===============Quaty================" << std::endl;
+  std::cerr << "PID: " << getpid() << std::endl;
+  
+  // Disable STDOUT buffering.
+  setbuf(stdout, NULL);
 
   // Figure out desired display size.
-  desiredInfo.width = calcinfo.width;
-  desiredInfo.height = calcinfo.height;
+  desiredInfo.width = proj.virtualWidth;
+  desiredInfo.height = proj.virtualHeight;
   desiredInfo.orientation = calcinfo.orientation;
 
 
@@ -478,21 +430,90 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
-  if (testOnly) {
-    if (gWaiter.waitForFrame() <= 0) {
-      MCERROR("Did not receive any frames");
-      std::cout << "FAIL" << std::endl;
-      return EXIT_FAILURE;
-    }
-
-    minicap_free(minicap);
-    std::cout << "OK" << std::endl;
-    return EXIT_SUCCESS;
-  }
-
   if (!server.start(sockname)) {
     MCERROR("Unable to start server on namespace '%s'", sockname);
     goto disaster;
+  }
+
+
+  if (walk_devices("/dev/input", &state) != 0) {
+    fprintf(stderr, "Unable to crawl %s for touch devices\n", "/dev/input");
+    goto disaster;
+  }
+
+  if (state.evdev == NULL)
+  {
+    fprintf(stderr, "Unable to find a suitable touch device\n");
+    goto disaster;
+  }
+
+
+    state.has_mtslot =
+    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_SLOT);
+  state.has_tracking_id =
+    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TRACKING_ID);
+  state.has_key_btn_touch =
+    libevdev_has_event_code(state.evdev, EV_KEY, BTN_TOUCH);
+  state.has_touch_major =
+    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TOUCH_MAJOR);
+  state.has_width_major =
+    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_WIDTH_MAJOR);
+
+  state.has_pressure =
+    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_PRESSURE);
+  state.min_pressure = state.has_pressure ?
+    libevdev_get_abs_minimum(state.evdev, ABS_MT_PRESSURE) : 0;
+  state.max_pressure= state.has_pressure ?
+    libevdev_get_abs_maximum(state.evdev, ABS_MT_PRESSURE) : 0;
+
+  state.max_x = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_X);
+  state.max_y = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_Y);
+
+  state.max_tracking_id = state.has_tracking_id
+    ? libevdev_get_abs_maximum(state.evdev, ABS_MT_TRACKING_ID)
+    : INT_MAX;
+
+  if (!state.has_mtslot && state.max_tracking_id == 0)
+  {
+    // The touch device reports incorrect values. There would be no point
+    // in supporting ABS_MT_TRACKING_ID at all if the maximum value was 0
+    // (i.e. one contact). This happens on Lenovo Yoga Tablet B6000-F,
+    // which actually seems to support ~10 contacts. So, we'll just go with
+    // as many as we can and hope that the system will ignore extra contacts.
+    state.max_tracking_id = MAX_SUPPORTED_CONTACTS - 1;
+    fprintf(stderr,
+      "Note: type A device reports a max value of 0 for ABS_MT_TRACKING_ID. "
+      "This means that the device is most likely reporting incorrect "
+      "information. Guessing %d.\n",
+      state.max_tracking_id
+    );
+  }
+
+
+  state.max_contacts = state.has_mtslot
+    ? libevdev_get_abs_maximum(state.evdev, ABS_MT_SLOT) + 1
+    : (state.has_tracking_id ? state.max_tracking_id + 1 : 2);
+
+  state.tracking_id = 0;
+
+  int contact;
+  for (contact = 0; contact < MAX_SUPPORTED_CONTACTS; ++contact)
+  {
+    state.contacts[contact].enabled = 0;
+  }
+
+  fprintf(stderr,
+    "%s touch device %s (%dx%d with %d contacts) detected on %s (score %d)\n",
+    state.has_mtslot ? "Type B" : "Type A",
+    libevdev_get_name(state.evdev),
+    state.max_x, state.max_y, state.max_contacts,
+    state.path, state.score
+  );
+
+  if (state.max_contacts > MAX_SUPPORTED_CONTACTS) {
+    fprintf(stderr, "Note: hard-limiting maximum number of contacts to %d\n",
+      MAX_SUPPORTED_CONTACTS);
+    state.max_contacts = MAX_SUPPORTED_CONTACTS;
   }
 
   // Prepare banner for clients.
@@ -515,10 +536,20 @@ main(int argc, char* argv[]) {
   // ======================================================
 
   int fd;
+  
+  // FILE* output;
+  pthread_t touchReadThread;
   while (!gWaiter.isStopped() && (fd = server.accept()) > 0) {
     MCINFO("New client connection");
 
     if (pumps(fd, banner, BANNER_SIZE) < 0) {
+      close(fd);
+      continue;
+    }
+
+    state.input = fdopen(fd, "r");
+    if (pthread_create(&touchReadThread, NULL, io_handler, &state) != 0){
+      fclose(state.input);
       close(fd);
       continue;
     }
@@ -597,16 +628,13 @@ main(int argc, char* argv[]) {
       if (grotation != preRotation) {
         Minicap::DisplayInfo info;
         minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
-        realInfo.width = info.width;
-        realInfo.height = info.height;
-        desiredInfo.width = info.width;
-        desiredInfo.height = info.height;
+        // realInfo.width = info.width;
+        // realInfo.height = info.height;
+        // desiredInfo.width = info.width;
+        // desiredInfo.height = info.height;
         desiredInfo.orientation = info.orientation;
-        
         minicap->setRealInfo(realInfo);
         minicap->setDesiredInfo(desiredInfo);
-        std::cerr << "new w:" << desiredInfo.width << ",h:" << desiredInfo.height << ",r:" << grotation << std::endl;
-
         minicap->applyConfigChanges();
 
         preRotation = grotation;
@@ -615,6 +643,7 @@ main(int argc, char* argv[]) {
 
 close:
     MCINFO("Closing client connection");
+    fclose(state.input);
     close(fd);
 
     // Have we consumed one frame but are still holding it?

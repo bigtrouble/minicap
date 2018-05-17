@@ -23,8 +23,8 @@ else
   adb push jni/minicap-shared/aosp/libs/android-$sdk/$abi/minicap.so $dir
 fi
 
-size=$(adb shell dumpsys window | grep -Eo 'init=[0-9]+x[0-9]+' | head -1 | cut -d= -f 2)
-args="-P $size@$size/0"
+# size=$(adb shell dumpsys window | grep -Eo 'init=[0-9]+x[0-9]+' | head -1 | cut -d= -f 2)
+args="-P 480x850"
 echo mobilesize: $args
 adb shell chmod 777 $dir/minicap
 adb shell LD_LIBRARY_PATH=$dir $dir/minicap $args "$@"

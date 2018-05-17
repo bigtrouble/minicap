@@ -207,65 +207,38 @@ signal_handler(int signum) {
 }
 
 static int pthread_flag = 1;
-static pthread_cond_t cond;
-static pthread_mutex_t mutex;
-static pthread_mutex_t restmutex;
-static int rotation = 0;
+static int grotation = 0;
 
 static Minicap::DisplayInfo realInfo;
 static Minicap::DisplayInfo desiredInfo;
 static Minicap* minicap;
-static int isreset = 0;
 
 static void *thread_func(void *vptr_args)
 {
-    pthread_mutex_lock(&mutex);
     do{
-
-      Minicap::DisplayInfo info;
-      minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
-      
-      switch (info.orientation) {
-        case Minicap::ORIENTATION_0:
-          rotation = 0;
-          break;
-        case Minicap::ORIENTATION_90:
-          rotation = 90;
-          break;
-        case Minicap::ORIENTATION_180:
-          rotation = 180;
-          break;
-        case Minicap::ORIENTATION_270:
-          rotation = 270;
-          break;
-      }
-
-      if (desiredInfo.orientation != info.orientation) {
-        pthread_mutex_lock(&restmutex);
-        
-        realInfo.width = info.width;
-        realInfo.height = info.height;
-        desiredInfo.width = info.width;
-        desiredInfo.height = info.height;
-        desiredInfo.orientation = info.orientation;
-        
-        minicap->setRealInfo(realInfo);
-        minicap->setDesiredInfo(desiredInfo);
-        std::cerr << "new w:" << desiredInfo.width << ",h:" << desiredInfo.height << ",r:" << rotation << std::endl;
-
-        minicap->applyConfigChanges();
-        isreset = 1;
-        pthread_mutex_unlock(&restmutex);
-      }
 
       timeval delay;
       delay.tv_sec = 0;
       delay.tv_usec = 300 * 1000; // 300 ms
       select(0, NULL, NULL, NULL, &delay);
 
+      Minicap::DisplayInfo info;
+      minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
+      switch (info.orientation) {
+        case Minicap::ORIENTATION_0:
+          grotation = 0;
+          break;
+        case Minicap::ORIENTATION_90:
+          grotation = 90;
+          break;
+        case Minicap::ORIENTATION_180:
+          grotation = 180;
+          break;
+        case Minicap::ORIENTATION_270:
+          grotation = 270;
+          break;
+      }
     } while(pthread_flag);
-
-    pthread_mutex_unlock(&mutex);
 }
 
 int
@@ -402,6 +375,23 @@ main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
+
+  int preRotation = 0;
+  switch (calcinfo.orientation) {
+    case Minicap::ORIENTATION_0:
+      preRotation = 0;
+      break;
+    case Minicap::ORIENTATION_90:
+      preRotation = 90;
+      break;
+    case Minicap::ORIENTATION_180:
+      preRotation = 180;
+      break;
+    case Minicap::ORIENTATION_270:
+      preRotation = 270;
+      break;
+    }
+
   // Set real display size.
   realInfo.width = calcinfo.width;
   realInfo.height = calcinfo.height;
@@ -536,8 +526,6 @@ main(int argc, char* argv[]) {
     int pending, err;
     while (!gWaiter.isStopped() && (pending = gWaiter.waitForFrame()) > 0) {
       
-      pthread_mutex_lock(&restmutex);
-
       if (skipFrames && pending > 1) {
         // Skip frames if we have too many. Not particularly thread safe,
         // but this loop should be the only consumer anyway (i.e. nothing
@@ -560,11 +548,15 @@ main(int argc, char* argv[]) {
         }
       }
 
+      if( NULL == (&frame)) {
+        MCINFO(" invalid frame...  ");
+        continue;
+      }
+
       if ((err = minicap->consumePendingFrame(&frame)) != 0) {
         if(err == -22){
             MCINFO(" -22  ");
             minicap->releaseConsumedFrame(&frame);
-            pthread_mutex_unlock(&restmutex);
             continue;
         }
         else if (err == -EINTR) {
@@ -590,7 +582,7 @@ main(int argc, char* argv[]) {
       unsigned char* data = encoder.getEncodedData() - 8;
       size_t size = encoder.getEncodedSize();
 
-      putUInt32LE(data, rotation);
+      putUInt32LE(data, grotation);
       putUInt32LE(data + 4, size);
 
       if (pumps(fd, data, size + 8) < 0) {
@@ -602,7 +594,23 @@ main(int argc, char* argv[]) {
       minicap->releaseConsumedFrame(&frame);
       haveFrame = false;
 
-      pthread_mutex_unlock(&restmutex);
+      if (grotation != preRotation) {
+        Minicap::DisplayInfo info;
+        minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
+        realInfo.width = info.width;
+        realInfo.height = info.height;
+        desiredInfo.width = info.width;
+        desiredInfo.height = info.height;
+        desiredInfo.orientation = info.orientation;
+        
+        minicap->setRealInfo(realInfo);
+        minicap->setDesiredInfo(desiredInfo);
+        std::cerr << "new w:" << desiredInfo.width << ",h:" << desiredInfo.height << ",r:" << grotation << std::endl;
+
+        minicap->applyConfigChanges();
+
+        preRotation = grotation;
+      }
   }
 
 close:

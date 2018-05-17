@@ -18,7 +18,7 @@ wss.on('connection', function(ws) {
     let e = JSON.parse(msg);
     switch(e.type) {
       case 'mousedown':
-        let msg = `d 0 50 ${e.x} ${e.y}\n`;
+        let msg = `d 0 ${e.x} ${e.y} 50\n`;
         stream.write(msg)
         stream.write(`c\n`)
         break;

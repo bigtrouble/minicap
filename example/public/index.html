@@ -105,6 +105,7 @@ var app = new Vue({
     },
     async detectDetect() {
       if(this.detect){
+          this.dg.clearRect(0,0,this.detcanvas.width,this.detcanvas.height)
           this.dg.strokeStyle="red";
           this.dg.lineWidth="6";
           this.dg.font="bold 20px sans-serif";

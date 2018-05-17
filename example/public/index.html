@@ -9,22 +9,30 @@
 
 <!doctype html>
 <div id='app'>
-<div style='padding:5px;display:flex;'>
-  <canvas ref="canvas" style="max-width: calc(100vw - 400px);max-height: calc(100vh - 10px);outline: 1px solid white;"></canvas>
-  <button @click="calc" v-show="!detecting">calc</button>
-  <div v-if="detect" style='margin-left:10px'>
-    <div style='border:1px solid black;background: white'>
-      <p>类别：{{detect.clzName}}</p>
-      <p>计算耗时：{{detect.objClassCostTime}} ms</p>
-      <p>计算平台：{{detect.objClassDeployTarget}}</p>
-      <p>置信度：{{detect.score}}</p>
+<div>
+  <div style='position:relative'>
+    <div>
+      <canvas ref="canvas" style="position:absolute; left:5px;top:5px; max-width: calc(100vw - 400px);max-height: calc(100vh - 10px);outline: 1px solid white;"></canvas>
+      <canvas ref="detcanvas" style="position:absolute; left:5px;top:5px; width: calc(100vw - 400px);max-height: calc(100vh - 10px);;"></canvas>
     </div>
-    <div style='border:1px solid black;background: white'>
-        <p>对像数：{{detect.detectionResult.length}}</p>
-        <p>计算耗时：{{detect.objDetectCostTime}} ms</p>
-        <p>计算平台：{{detect.objDetectDeployTarget}}</p>
-    </div>
-    <button @click="stopCanvas" >Toogle Canvas Render</button>
+
+    <div style='float:right;margin-right:20px;margin-top:5px;'>
+        <button @click="calc" v-show="!detecting">calc</button>
+        <div v-if="detect" style='margin-left:10px'>
+          <div style='border:1px solid black;background: white'>
+            <p>类别：{{detect.clzName}}</p>
+            <p>计算耗时：{{detect.objClassCostTime}} ms</p>
+            <p>计算平台：{{detect.objClassDeployTarget}}</p>
+            <p>置信度：{{detect.score}}</p>
+          </div>
+          <div style='border:1px solid black;background: white'>
+              <p>对像数：{{detect.detectionResult.length}}</p>
+              <p>计算耗时：{{detect.objDetectCostTime}} ms</p>
+              <p>计算平台：{{detect.objDetectDeployTarget}}</p>
+          </div>
+          <button @click="stopCanvas" >Toogle Canvas Render</button>
+        </div>
+      </div>
   </div>
 </div>
 </div>
@@ -37,7 +45,9 @@ var app = new Vue({
     return {
       ws : null,
       canvas: null,
+      detcanvas: null,
       g: null,
+      dg: null,
       axios: null,
       detect: null,
       detecting: false,
@@ -51,11 +61,15 @@ var app = new Vue({
     this.ws.onmessage = this.onmessage
     this.ws.onopen = () => {
       this.canvas = this.$refs.canvas;
+      this.detcanvas = this.$refs.detcanvas;
       this.g = this.canvas.getContext('2d');
+      this.dg = this.detcanvas.getContext('2d');
     }
     this.img.onload = () => {
       this.canvas.width = this.img.width
       this.canvas.height = this.img.height
+      this.detcanvas.width = this.img.width
+      this.detcanvas.height = this.img.height
       this.g.drawImage(this.img,0,0);
       this.detectDetect();
     }
@@ -91,13 +105,13 @@ var app = new Vue({
     },
     async detectDetect() {
       if(this.detect){
-          this.g.strokeStyle="red";
-          this.g.lineWidth="6";
-          this.g.font="bold 20px sans-serif";
-          this.g.fillStyle = "red";
+          this.dg.strokeStyle="red";
+          this.dg.lineWidth="6";
+          this.dg.font="bold 20px sans-serif";
+          this.dg.fillStyle = "red";
           for( let d of this.detect.detectionResult ){
-            this.g.strokeRect(d.x, d.y, d.width, d.height);
-            this.g.fillText(d.name, d.x,d.y - 15);
+            this.dg.strokeRect(d.x, d.y, d.width, d.height);
+            this.dg.fillText(d.name, d.x,d.y - 15);
           }
       }
     },

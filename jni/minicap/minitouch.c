@@ -679,22 +679,7 @@ static void parse_input(char* buffer, internal_state_t* state)
       if (g_verbose)
         fprintf(stderr, "Waiting %ld ms\n", wait);
       usleep(wait * 1000);
-      break;
-    case 't':
-      dx = strtol(cursor, &cursor, 10);
-      dy = strtol(cursor, &cursor, 10);
-      {
-        char buf[128];
-        char cmd[100];
-        snprintf(cmd, 100, "/system/bin/input trackball roll %ld %ld", dx, dy);
-        FILE *fp;
-         if( (fp = popen(cmd, "r")) == NULL ){
-           fprintf(stderr, "exec input error!");
-         }
-         pclose(fp);
-      }
-      break;
-      
+      break;      
     default:
       break;
   }

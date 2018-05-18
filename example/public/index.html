@@ -18,6 +18,7 @@
         @mouseup="onMouseUp"
         @mousemove="onMouseMove"
         @mouseleave="onMouseLeave"
+        @mousewheel="onWheel"
       ></canvas>
     </div>
 
@@ -91,6 +92,9 @@ var app = new Vue({
     });
   },
   methods: {
+    onWheel(e) {
+      console.log(e)
+    },
     onMouseDown({x,y}) {
       if(this.toching === false) {
         let msg = JSON.stringify({ type: 'mousedown', x,y });

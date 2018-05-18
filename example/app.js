@@ -144,28 +144,18 @@ wss.on('connection', function(ws) {
           readRotation += (chunk[cursor] << (readRotationBytes * 8)) >>> 0
           cursor += 1
           readRotationBytes += 1
-
-          if (readRotationBytes == 4) {
-            console.info('readRotation:%d', readRotation)
-          }
-          
         }
         else if (readFrameBytes < 4) {
           frameBodyLength += (chunk[cursor] << (readFrameBytes * 8)) >>> 0
           cursor += 1
           readFrameBytes += 1
-          // console.info('headerbyte%d(val=%d)', readFrameBytes, frameBodyLength)
         }
         else {
           if (len - cursor >= frameBodyLength) {
-            // console.info('bodyfin(len=%d,cursor=%d)', frameBodyLength, cursor)
-
             frameBody = Buffer.concat([
               frameBody
             , chunk.slice(cursor, cursor + frameBodyLength)
             ])
-
-            // Sanity check for JPG header, only here for debugging purposes.
             if (frameBody[0] !== 0xFF || frameBody[1] !== 0xD8) {
               console.error(
                 'Frame body does not start with JPG header', frameBody)

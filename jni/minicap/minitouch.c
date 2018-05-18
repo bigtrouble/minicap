@@ -109,7 +109,7 @@ static int consider_device(const char* devpath, internal_state_t* state)
   if (!is_multitouch_device(evdev))
   {
 
-    fprintf(stderr, " =>>>>>>>>>>>>> \n", devpath);
+    fprintf(stderr, " =>>>>>>>>>>>>> %s \n", devpath);
 
     goto mismatch;
   }

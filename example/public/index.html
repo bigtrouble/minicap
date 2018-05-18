@@ -17,6 +17,7 @@
         @mousedown="onMouseDown"
         @mouseup="onMouseUp"
         @mousemove="onMouseMove"
+        @mouseleave="onMouseLeave"
       ></canvas>
     </div>
 
@@ -57,7 +58,8 @@ var app = new Vue({
       detecting: false,
       isstopCanvas: false,
       img: new Image(),
-      toching: false
+      toching: false,
+      preMoveSendTime: 0
     }
   },
   mounted () {
@@ -90,19 +92,32 @@ var app = new Vue({
   },
   methods: {
     onMouseDown({x,y}) {
-      let msg = JSON.stringify({ type: 'mousedown', x,y });
-      this.ws.send(msg);
-      this.toching = true;
+      if(this.toching === false) {
+        let msg = JSON.stringify({ type: 'mousedown', x,y });
+        this.ws.send(msg);
+        this.toching = true;
+      }
     },
     onMouseUp({x,y}) {
-      let msg = JSON.stringify({ type: 'mouseup', x,y });
-      this.ws.send(msg);
-      this.toching = false;
+      if(this.toching) {
+        let msg = JSON.stringify({ type: 'mouseup', x,y });
+        this.ws.send(msg);
+        this.toching = false;
+      }
     },
     onMouseMove({x,y}){
       if(this.toching) {
-        let msg = JSON.stringify({ type: 'mousemove', x,y });
-        this.ws.send(msg);
+        if(new Date().getTime() - this.preMoveSendTime > 50) {
+          let msg = JSON.stringify({ type: 'mousemove', x,y });
+          this.ws.send(msg);
+          this.preMoveSendTime = new Date().getTime();
+        }
+        
+      }
+    },
+    onMouseLeave(e) {
+      if(this.toching) {
+        this.onMouseUp(e)
       }
     },
     stopCanvas () {

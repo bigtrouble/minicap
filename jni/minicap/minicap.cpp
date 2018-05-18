@@ -31,7 +31,7 @@
 
 #define DEFAULT_SOCKET_NAME "minicap"
 #define DEFAULT_DISPLAY_ID 0
-#define DEFAULT_JPG_QUALITY 80
+#define DEFAULT_JPG_QUALITY 75
 
 enum {
   QUIRK_DUMB            = 1,
@@ -337,6 +337,7 @@ main(int argc, char* argv[]) {
   state.realHeight = calcinfo.height;
   state.virtualWidth = proj.virtualWidth;
   state.virtualHeight = proj.virtualHeight;
+  state.orientation = preRotation;
 
 
   proj.forceMaximumSize();
@@ -633,11 +634,8 @@ main(int argc, char* argv[]) {
       if (grotation != preRotation) {
         Minicap::DisplayInfo info;
         minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
-        // realInfo.width = info.width;
-        // realInfo.height = info.height;
-        // desiredInfo.width = info.width;
-        // desiredInfo.height = info.height;
         desiredInfo.orientation = info.orientation;
+        state.orientation = info.orientation;
         minicap->setRealInfo(realInfo);
         minicap->setDesiredInfo(desiredInfo);
         minicap->applyConfigChanges();

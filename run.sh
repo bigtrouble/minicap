@@ -1,6 +1,6 @@
 #!/bin/sh
 # set -exo pipefail
-ndk-build.cmd -j4 NDK_DEBUG=0 1>&2
+ /usr/local/android-ndk-r17/ndk-build -j4 NDK_DEBUG=0 1>&2
 
 abi=$(adb shell getprop ro.product.cpu.abi | tr -d '\r')
 sdk=$(adb shell getprop ro.build.version.sdk | tr -d '\r')

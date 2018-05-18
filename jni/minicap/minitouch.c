@@ -56,6 +56,7 @@ typedef struct
   int realHeight;
   int virtualWidth;
   int virtualHeight;
+  uint32_t orientation;
 } internal_state_t;
 
 static int is_character_device(const char* devpath)
@@ -622,11 +623,27 @@ static int start_server(char* sockname)
 }
 
 
-static int calcRealX(internal_state_t* state, int virtualX) {
-  return round(state->realWidth * 1.0 / state->virtualWidth * virtualX);
-}
-static int calcRealY(internal_state_t* state, int virtualY) {
-  return round(state->realHeight * 1.0 / state->virtualHeight * virtualY);
+static int calcRealX(internal_state_t* state, int x, int y) {
+  switch(state->orientation){
+    case 270:
+    return round( ( y * 1.0 / state->virtualHeight) * state->realHeight );
+    case 90:
+    return round( y * 1.0 / state->virtualHeight * state->realHeight );
+      
+  }
+  return round(state->realWidth * 1.0 / state->virtualWidth  * x);
+  
+} 
+static int calcRealY(internal_state_t* state, int x, int y) {
+  switch(state->orientation){
+    case 90:
+    return round( (x *1.0 / state->virtualWidth) * state->realWidth );
+    case 270:
+    return round( (1 - x *1.0 / state->virtualWidth) * state->realWidth );
+
+  }
+  return round(state->realHeight * 1.0 / state->virtualHeight * y);
+  
 }
 
 static void parse_input(char* buffer, internal_state_t* state)
@@ -651,9 +668,9 @@ static void parse_input(char* buffer, internal_state_t* state)
         x = strtol(cursor, &cursor, 10);
         y = strtol(cursor, &cursor, 10);
         pressure = strtol(cursor, &cursor, 10);
-        int tx = calcRealX(state,x);
-        int ty = calcRealY(state,y);
-        fprintf(stderr, "Tx: %d,%d ms\n", tx,ty);
+        int tx = calcRealX(state,x,y);
+        int ty = calcRealY(state,x,y);
+        fprintf(stderr, "Tx: %d, %d,%d \n", state->orientation, tx,ty);
         touch_down(state, contact, tx, ty, pressure);
       }
       break;
@@ -662,7 +679,7 @@ static void parse_input(char* buffer, internal_state_t* state)
       x = strtol(cursor, &cursor, 10);
       y = strtol(cursor, &cursor, 10);
       pressure = strtol(cursor, &cursor, 10);
-      touch_move(state, contact, calcRealX(state,x), calcRealY(state,y), pressure);
+      touch_move(state, contact, calcRealX(state,x,y), calcRealY(state,x,y), pressure);
       break;
     case 'u': // TOUCH UP
       contact = strtol(cursor, &cursor, 10);

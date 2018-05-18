@@ -643,7 +643,7 @@ static int calcRealY(internal_state_t* state, int x, int y) {
 static void parse_input(char* buffer, internal_state_t* state)
 {
   char* cursor;
-  long int contact, x, y, pressure, wait;
+  long int contact, x, y, pressure, wait, dx, dy;
 
   cursor = (char*) buffer;
   cursor += 1;
@@ -657,15 +657,11 @@ static void parse_input(char* buffer, internal_state_t* state)
       touch_panic_reset_all(state);
       break;
     case 'd': // TOUCH DOWN
-      {
-        contact = strtol(cursor, &cursor, 10);
-        x = strtol(cursor, &cursor, 10);
-        y = strtol(cursor, &cursor, 10);
-        pressure = strtol(cursor, &cursor, 10);
-        int tx = calcRealX(state,x,y);
-        int ty = calcRealY(state,x,y);
-        touch_down(state, contact, tx, ty, pressure);
-      }
+      contact = strtol(cursor, &cursor, 10);
+      x = strtol(cursor, &cursor, 10);
+      y = strtol(cursor, &cursor, 10);
+      pressure = strtol(cursor, &cursor, 10);
+      touch_down(state, contact, calcRealX(state,x,y), calcRealY(state,x,y), pressure);
       break;
     case 'm': // TOUCH MOVE
       contact = strtol(cursor, &cursor, 10);
@@ -684,6 +680,21 @@ static void parse_input(char* buffer, internal_state_t* state)
         fprintf(stderr, "Waiting %ld ms\n", wait);
       usleep(wait * 1000);
       break;
+    case 't':
+      dx = strtol(cursor, &cursor, 10);
+      dy = strtol(cursor, &cursor, 10);
+      {
+        char buf[128];
+        char cmd[100];
+        snprintf(cmd, 100, "/system/bin/input trackball roll %ld %ld", dx, dy);
+        FILE *fp;
+         if( (fp = popen(cmd, "r")) == NULL ){
+           fprintf(stderr, "exec input error!");
+         }
+         pclose(fp);
+      }
+      break;
+      
     default:
       break;
   }

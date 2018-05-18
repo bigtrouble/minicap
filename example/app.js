@@ -40,13 +40,10 @@ wss.on('connection', function(ws) {
     port: 1313
   })
 
-  // setInterval(()=>{
-  //   stream.write('d 0 80 200 200\n')
-  //   stream.write('c\n')
-  //   stream.write('u 0\n')
-  //   stream.write('c\n')
-  //   console.log('...............')
-  // }, 3000)
+  setInterval(()=>{
+    stream.write('t 0 1\n')
+    console.log('...............')
+  }, 3000)
 
   stream.on('error', function() {
     console.error('Be sure to run `adb forward tcp:1313 localabstract:minicap`')

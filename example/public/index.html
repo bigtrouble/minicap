@@ -14,11 +14,11 @@
     <div>
       <canvas ref="canvas" style="position:absolute; left:5px;top:5px; outline: 1px solid white;"></canvas>
       <canvas ref="detcanvas" style="position:absolute; left:5px;top:5px;"
-        @mousedown="onMouseDown"
-        @mouseup="onMouseUp"
-        @mousemove="onMouseMove"
-        @mouseleave="onMouseLeave"
-        @mousewheel="onWheel"
+        @mousedown.prevent.stop="onMouseDown"
+        @mouseup.prevent.stop="onMouseUp"
+        @mousemove.prevent.stop="onMouseMove"
+        @mouseleave.prevent.stop="onMouseLeave"
+        @mousewheel.prevent.stop="onWheel"
       ></canvas>
     </div>
 

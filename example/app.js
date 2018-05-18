@@ -30,6 +30,9 @@ wss.on('connection', function(ws) {
         stream.write(`m 0 ${e.x} ${e.y} 50\n`)
         stream.write(`c\n`)
         break;
+      case 'roll':
+        stream.write(`t ${e.deltaX} ${e.deltaY}\n`)
+        break;
 
       default:
         console.log('unknow msg:', e)
@@ -39,11 +42,6 @@ wss.on('connection', function(ws) {
   var stream = net.connect({
     port: 1313
   })
-
-  setInterval(()=>{
-    stream.write('t 0 1\n')
-    console.log('...............')
-  }, 3000)
 
   stream.on('error', function() {
     console.error('Be sure to run `adb forward tcp:1313 localabstract:minicap`')

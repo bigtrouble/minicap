@@ -92,8 +92,9 @@ var app = new Vue({
     });
   },
   methods: {
-    onWheel(e) {
-      console.log(e)
+    onWheel({deltaX,deltaY}) {
+      let msg = JSON.stringify({ type: 'roll', deltaX , deltaY });
+      this.ws.send(msg);
     },
     onMouseDown({x,y}) {
       if(this.toching === false) {

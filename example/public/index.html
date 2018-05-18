@@ -107,7 +107,7 @@ var app = new Vue({
     },
     onMouseMove({x,y}){
       if(this.toching) {
-        if(new Date().getTime() - this.preMoveSendTime > 50) {
+        if(new Date().getTime() - this.preMoveSendTime > 10) {
           let msg = JSON.stringify({ type: 'mousemove', x,y });
           this.ws.send(msg);
           this.preMoveSendTime = new Date().getTime();

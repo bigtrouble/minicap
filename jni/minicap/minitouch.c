@@ -625,25 +625,19 @@ static int start_server(char* sockname)
 
 static int calcRealX(internal_state_t* state, int x, int y) {
   switch(state->orientation){
-    case 270:
-    return round( ( y * 1.0 / state->virtualHeight) * state->realHeight );
-    case 90:
-    return round( y * 1.0 / state->virtualHeight * state->realHeight );
-      
-  }
-  return round(state->realWidth * 1.0 / state->virtualWidth  * x);
-  
+    case 0  : return round( (     x * 1.0 / state->virtualWidth) * state->realWidth );
+    case 90 : return round( ( 1 - y * 1.0 / state->virtualWidth) * state->realWidth );
+    case 180: return round( ( 1 - x * 1.0 / state->virtualWidth) * state->realWidth );
+    case 270: return round( (     y * 1.0 / state->virtualWidth) * state->realWidth );
+  }  
 } 
 static int calcRealY(internal_state_t* state, int x, int y) {
   switch(state->orientation){
-    case 90:
-    return round( (x *1.0 / state->virtualWidth) * state->realWidth );
-    case 270:
-    return round( (1 - x *1.0 / state->virtualWidth) * state->realWidth );
-
+    case 0  : return round( (    y * 1.0 / state->virtualHeight) * state->realHeight );
+    case 90 : return round( (    x * 1.0 / state->virtualHeight) * state->realHeight );
+    case 180: return round( (1 - y * 1.0 / state->virtualHeight) * state->realHeight );
+    case 270: return round( (1 - x * 1.0 / state->virtualHeight) * state->realHeight );
   }
-  return round(state->realHeight * 1.0 / state->virtualHeight * y);
-  
 }
 
 static void parse_input(char* buffer, internal_state_t* state)
@@ -670,7 +664,6 @@ static void parse_input(char* buffer, internal_state_t* state)
         pressure = strtol(cursor, &cursor, 10);
         int tx = calcRealX(state,x,y);
         int ty = calcRealY(state,x,y);
-        fprintf(stderr, "Tx: %d, %d,%d \n", state->orientation, tx,ty);
         touch_down(state, contact, tx, ty, pressure);
       }
       break;

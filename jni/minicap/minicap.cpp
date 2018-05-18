@@ -635,7 +635,7 @@ main(int argc, char* argv[]) {
         Minicap::DisplayInfo info;
         minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
         desiredInfo.orientation = info.orientation;
-        state.orientation = info.orientation;
+        state.orientation = grotation;
         minicap->setRealInfo(realInfo);
         minicap->setDesiredInfo(desiredInfo);
         minicap->applyConfigChanges();

@@ -108,18 +108,6 @@ static int consider_device(const char* devpath, internal_state_t* state)
 
   if (!is_multitouch_device(evdev))
   {
-
-    int support_REL_X = libevdev_has_event_code(evdev, EV_REL, REL_X);
-    int support_REL_Y = libevdev_has_event_code(evdev, EV_REL, REL_Y);
-    int support_REL_RX = libevdev_has_event_code(evdev, EV_REL, REL_RX);
-    int support_REL_RY = libevdev_has_event_code(evdev, EV_REL, REL_RY);
-    int support_REL_HWHEEL = libevdev_has_event_code(evdev, EV_REL, REL_HWHEEL);
-    int support_REL_WHEEL = libevdev_has_event_code(evdev, EV_REL, REL_WHEEL);
-    fprintf(stderr, " =>>>>>>>>>>>>> %s: %d,%d,%d,%d,%d,%d \n", devpath, 
-      support_REL_X, support_REL_Y,
-      support_REL_RX, support_REL_RY,
-      support_REL_HWHEEL, support_REL_WHEEL);
-
     goto mismatch;
   }
 

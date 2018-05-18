@@ -454,33 +454,20 @@ main(int argc, char* argv[]) {
   }
 
 
-    state.has_mtslot =
-    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_SLOT);
-  state.has_tracking_id =
-    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TRACKING_ID);
-  state.has_key_btn_touch =
-    libevdev_has_event_code(state.evdev, EV_KEY, BTN_TOUCH);
-  state.has_touch_major =
-    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TOUCH_MAJOR);
-  state.has_width_major =
-    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_WIDTH_MAJOR);
+  state.has_mtslot        = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_SLOT);
+  state.has_tracking_id   = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TRACKING_ID);
+  state.has_key_btn_touch = libevdev_has_event_code(state.evdev, EV_KEY, BTN_TOUCH);
+  state.has_touch_major   = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TOUCH_MAJOR);
+  state.has_width_major   = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_WIDTH_MAJOR);
+  state.has_pressure      = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_PRESSURE);
+  state.min_pressure      = state.has_pressure ? libevdev_get_abs_minimum(state.evdev, ABS_MT_PRESSURE) : 0;
+  state.max_pressure      = state.has_pressure ? libevdev_get_abs_maximum(state.evdev, ABS_MT_PRESSURE) : 0;
+  state.max_x             = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_X);
+  state.max_y             = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_Y);
 
-  state.has_pressure =
-    libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_PRESSURE);
-  state.min_pressure = state.has_pressure ?
-    libevdev_get_abs_minimum(state.evdev, ABS_MT_PRESSURE) : 0;
-  state.max_pressure= state.has_pressure ?
-    libevdev_get_abs_maximum(state.evdev, ABS_MT_PRESSURE) : 0;
+  state.max_tracking_id = state.has_tracking_id ? libevdev_get_abs_maximum(state.evdev, ABS_MT_TRACKING_ID) : INT_MAX;
 
-  state.max_x = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_X);
-  state.max_y = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_Y);
-
-  state.max_tracking_id = state.has_tracking_id
-    ? libevdev_get_abs_maximum(state.evdev, ABS_MT_TRACKING_ID)
-    : INT_MAX;
-
-  if (!state.has_mtslot && state.max_tracking_id == 0)
-  {
+  if (!state.has_mtslot && state.max_tracking_id == 0) {
     // The touch device reports incorrect values. There would be no point
     // in supporting ABS_MT_TRACKING_ID at all if the maximum value was 0
     // (i.e. one contact). This happens on Lenovo Yoga Tablet B6000-F,

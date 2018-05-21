@@ -150,11 +150,18 @@ var app = new Vue({
           this.dg.clearRect(0,0,this.detcanvas.width,this.detcanvas.height)
           this.dg.strokeStyle="red";
           this.dg.lineWidth="6";
-          this.dg.font="bold 20px sans-serif";
-          this.dg.fillStyle = "red";
+          
           for( let d of this.detect.detectionResult ){
+
             this.dg.strokeRect(d.x, d.y, d.width, d.height);
+
+            this.dg.font="bold 20px sans-serif";
+            this.dg.fillStyle = "red";
             this.dg.fillText(d.name, d.x,d.y - 15);
+
+            this.dg.font="bold 14px sans-serif";
+            this.dg.fillStyle = "green";
+            this.dg.fillText(d.score, d.x,d.y-30);
           }
       }
     },

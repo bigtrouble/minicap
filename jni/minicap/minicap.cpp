@@ -31,7 +31,7 @@
 
 #define DEFAULT_SOCKET_NAME "minicap"
 #define DEFAULT_DISPLAY_ID 0
-#define DEFAULT_JPG_QUALITY 75
+#define DEFAULT_JPG_QUALITY 85
 
 enum {
   QUIRK_DUMB            = 1,

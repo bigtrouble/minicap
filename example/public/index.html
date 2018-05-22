@@ -6,6 +6,7 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdn.rawgit.com/eligrey/FileSaver.js/5ed507ef8aa53d8ecfea96d96bc7214cd2476fd2/FileSaver.min.js"></script>
 
 <!doctype html>
 <div id='app'>
@@ -22,6 +23,7 @@
     </div>
 
     <div style='float:right;margin-right:20px;margin-top:5px;'>
+        <button @click="download" >download</button>
         <button @click="calc" v-show="!detecting">calc</button>
         <div v-if="detect" style='margin-left:10px'>
           <div style='border:1px solid black;background: white'>
@@ -91,6 +93,11 @@ var app = new Vue({
     });
   },
   methods: {
+    download() {
+      this.$refs.canvas.toBlob(blob => {
+        saveAs(blob, imageName=new Date().getTime() + ".jpg")
+      }, 'image/jpeg')
+    },
     onMouseDown({x,y}) {
       if(this.toching === false) {
         let msg = JSON.stringify({ type: 'mousedown', x,y });

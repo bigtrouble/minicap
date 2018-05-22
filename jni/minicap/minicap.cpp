@@ -333,8 +333,7 @@ main(int argc, char* argv[]) {
   proj.realHeight = calcinfo.height;
   proj.rotation = preRotation;
 
-  state.realWidth = calcinfo.width;
-  state.realHeight = calcinfo.height;
+
   state.virtualWidth = proj.virtualWidth;
   state.virtualHeight = proj.virtualHeight;
   state.orientation = preRotation;
@@ -502,6 +501,9 @@ main(int argc, char* argv[]) {
     state.max_x, state.max_y, state.max_contacts,
     state.path, state.score
   );
+
+  state.realWidth = state.max_x;
+  state.realHeight = state.max_y;
 
   if (state.max_contacts > MAX_SUPPORTED_CONTACTS) {
     fprintf(stderr, "Note: hard-limiting maximum number of contacts to %d\n",

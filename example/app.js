@@ -13,7 +13,7 @@ var server = http.createServer(app)
 var wss = new WebSocketServer({ server: server })
 
 wss.on('connection', function(ws) {
-  
+
   ws.on('message', function(msg) {
     let e = JSON.parse(msg);
     switch(e.type) {
@@ -156,9 +156,14 @@ wss.on('connection', function(ws) {
               process.exit(1)
             }
 
-            ws.send(frameBody, {
-              binary: true
-            })
+            try {
+              ws.send(frameBody, {
+                binary: true
+              })
+            } catch(e) {
+              console.log(e)
+            }
+            
 
             cursor += frameBodyLength
             frameBodyLength = readFrameBytes = readRotationBytes = readRotation = 0

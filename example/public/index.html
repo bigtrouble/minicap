@@ -25,6 +25,7 @@
     <div style='float:right;margin-right:20px;margin-top:5px;'>
         <button @click="download" >download</button>
         <button @click="calc" v-show="!detecting">calc</button>
+        <button @click="runScript" v-show="!scriptRuning">RunScript</button>
         <div v-if="detect" style='margin-left:10px'>
           <div style='border:1px solid black;background: white'>
             <p>类别：{{detect.clzName}}</p>
@@ -60,6 +61,7 @@ var app = new Vue({
       axios: null,
       detect: null,
       detecting: false,
+      scriptRuning: false,
       isstopCanvas: false,
       img: new Image(),
       toching: false,
@@ -99,6 +101,11 @@ var app = new Vue({
       this.$refs.canvas.toBlob(blob => {
         saveAs(blob, imageName=new Date().getTime() + ".jpg")
       }, 'image/jpeg')
+    },
+    touch(x,y) {
+      console.log( 'touch -- x:', x , ',y:' , y)
+      this.onMouseDown({x,y});
+      this.onMouseUp({x,y});
     },
     onMouseDown({x,y}) {
       if(this.toching === false) {
@@ -150,9 +157,51 @@ var app = new Vue({
         let fd = new FormData()
         fd.append('file', blob)
         this.detect = (await this.axios.post('/25/21',fd)).data;
-        await this.$sleep(100);
+        // await this.$sleep(100);
       }
       this.detecting = false
+    },
+    async runScript() {
+      this.scriptRuning = true
+      while(true){
+        await this.$sleep(1000);
+
+        if(!this.detect) {
+          continue;
+        }
+
+        var tags = this.detect.detectionResult
+        
+        for(let t of tags) {
+          switch(t.name) {
+            case "LGKD#GUIDE_BOTTOM_POINTER":
+              this.touch(t.x, t.y+t.height);
+              continue;
+
+            case "LGKD#GUIDE_RIGHTBOTTOM_POINTER":
+              this.touch(t.x+t.width, t.y+t.height);
+              continue;
+
+            case "LGKD#GUIDE_LEFTTOP_POINTER":
+              this.touch(t.x, t.y);
+              continue;
+
+            case "LGKD#GUIDE_RIGHTTOP_POINTER":
+              this.touch(t.x + t.width, t.y);
+              continue;
+
+            case "LGKD#BTN_CLICK":
+            case "LGKD#BTN_OK":
+            case "LGKD#DLG_CONTEXT":
+            case "LGKD#BTN_NO":
+              console.log(JSON.stringify(t))
+              this.touch( Math.round(t.x+ t.width/2) , Math.round(t.y+t.height/2) );
+              continue;
+          }
+        }
+
+        // console.log(this.detect)
+      }
     },
     async detectDetect() {
       if(this.detect){

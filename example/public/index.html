@@ -151,15 +151,20 @@ var app = new Vue({
       })
     },
     async calc() {
-      while(true) {
-        this.detecting = true
-        let blob = await this.toBlob()
-        let fd = new FormData()
-        fd.append('file', blob)
-        this.detect = (await this.axios.post('/34/31',fd)).data;
-        // await this.$sleep(100);
+      try {
+        while(true) {
+          this.detecting = true
+          let blob = await this.toBlob()
+          let fd = new FormData()
+          fd.append('file', blob)
+          this.detect = (await this.axios.post('/35/31',fd)).data;
+          // await this.$sleep(100);
+        }
+      } catch(e) {
+        alert(e)
+      } finally {
+        this.detecting = false
       }
-      this.detecting = false
     },
     async runScript() {
       this.scriptRuning = true

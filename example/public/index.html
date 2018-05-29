@@ -38,7 +38,7 @@
               <p>计算耗时：{{detect.objDetectCostTime}} ms</p>
               <p>计算平台：{{detect.objDetectDeployTarget}}</p>
               <hr>
-              <p v-for="c in detect.detectionResult">{{c.name}}</p>
+              <p v-for="c in detect.detectionResult">{{c.name}}({{c.score}})</p>
           </div>
           <button @click="stopCanvas" >Toogle Canvas Render</button>
         </div>
@@ -156,7 +156,7 @@ var app = new Vue({
         let blob = await this.toBlob()
         let fd = new FormData()
         fd.append('file', blob)
-        this.detect = (await this.axios.post('/25/21',fd)).data;
+        this.detect = (await this.axios.post('/34/31',fd)).data;
         // await this.$sleep(100);
       }
       this.detecting = false
@@ -194,6 +194,7 @@ var app = new Vue({
             case "LGKD#BTN_OK":
             case "LGKD#DLG_CONTEXT":
             case "LGKD#BTN_NO":
+            case "LGKD#BTN_CLOSE":
               console.log(JSON.stringify(t))
               this.touch( Math.round(t.x+ t.width/2) , Math.round(t.y+t.height/2) );
               continue;

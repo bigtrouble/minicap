@@ -179,6 +179,7 @@ Appears a potentially unlimited number of times.
 
 | Bytes | Length | Type | Explanation |
 |-------|--------|------|-------------|
+| 0-3   | 4 | uint32 (low endian) | RotationBytes (=n) |
 | 0-3   | 4 | uint32 (low endian) | Frame size in bytes (=n) |
 | 4-(n+4) | n | unsigned char[] | Frame in JPG format |
 

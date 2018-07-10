@@ -13,6 +13,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <time.h>
 
 #include <Minicap.hpp>
 
@@ -104,8 +105,10 @@ private:
   bool mStopped;
 };
 
+pthread_mutex_t mutex;
 static int
 pumpf(unsigned char* data, size_t length) {
+  pthread_mutex_lock(&mutex);
   do {
     int wrote = fwrite(data, 1, length, stdout);
     fflush(stdout);
@@ -117,7 +120,7 @@ pumpf(unsigned char* data, size_t length) {
     length -= wrote;
   }
   while (length > 0);
-
+  pthread_mutex_unlock(&mutex);
   return 0;
 }
 
@@ -127,6 +130,11 @@ putUInt32LE(unsigned char* data, int value) {
   data[1] = (value & 0x0000FF00) >> 8;
   data[2] = (value & 0x00FF0000) >> 16;
   data[3] = (value & 0xFF000000) >> 24;
+}
+
+static int
+putUInt1LE(unsigned char* data, char value) {
+  data[0] = value;
 }
 
 static int
@@ -220,6 +228,15 @@ static void *thread_func(void *vptr_args)
     } while(pthread_flag);
 }
 
+
+static void *pong_func(void *args) {
+  unsigned char pong = 0x03;
+  while(1) {
+    sleep(3);
+    pumpf(&pong,1);
+  }
+}
+
 int
 main(int argc, char* argv[]) {
   const char* pname = argv[0];
@@ -303,6 +320,9 @@ main(int argc, char* argv[]) {
       preRotation = 270;
       break;
     }
+
+
+
   // Set real display size.
   realInfo.width = calcinfo.width;
   proj.realWidth = calcinfo.width;
@@ -338,9 +358,9 @@ main(int argc, char* argv[]) {
   desiredInfo.orientation = calcinfo.orientation;
 
 
-  // Leave a 4-byte padding to the encoder so that we can inject the size
+  // Leave a 5-byte padding to the encoder so that we can inject the flag & size
   // to the same buffer.
-  JpgEncoder encoder(8, 0);
+  JpgEncoder encoder(5, 0);
   Minicap::Frame frame;
   bool haveFrame = false;
 
@@ -498,6 +518,14 @@ main(int argc, char* argv[]) {
   if (pthread_create(&thread, NULL, thread_func, NULL) != 0){
       return EXIT_FAILURE;
   }
+
+
+  // =======================================================
+  pthread_t pongthread;
+  if (pthread_create(&pongthread, NULL, pong_func, NULL) != 0){
+      return EXIT_FAILURE;
+  }
+
   // ======================================================
   pthread_t touchReadThread;
   state.input = stdin;
@@ -510,6 +538,17 @@ main(int argc, char* argv[]) {
 
     if (pumpf(banner, BANNER_SIZE) < 0) {
       return EXIT_FAILURE;;
+    }
+    
+
+    //send init rotation
+    {
+      unsigned char *rdatainit = (unsigned char*) malloc(5);
+      putUInt1LE(rdatainit, 0x02);
+      putUInt32LE(rdatainit + 1, preRotation);
+      pumpf(rdatainit, 5);
+      free(rdatainit);
+      grotation = preRotation;
     }
     
 
@@ -569,12 +608,21 @@ main(int argc, char* argv[]) {
 
       // Push it out synchronously because it's fast and we don't care
       // about other clients.
-      unsigned char* data = encoder.getEncodedData() - 8;
+      unsigned char* data = encoder.getEncodedData() - 5;
       size_t size = encoder.getEncodedSize();
-      putUInt32LE(data, grotation);
-      putUInt32LE(data + 4, size);
 
-      if (pumpf(data, size + 8) < 0) {
+      if (grotation != preRotation) {
+        unsigned char* rdata = (unsigned char*)malloc(5);
+        putUInt1LE(rdata, 0x02);
+        putUInt32LE(rdata + 1, grotation);
+        pumpf(rdata, 5);
+        free(rdata);
+      }
+
+      putUInt1LE(data, 0x01);
+      putUInt32LE(data + 1, size);
+
+      if (pumpf(data, size + 5) < 0) {
          break;
       }
 

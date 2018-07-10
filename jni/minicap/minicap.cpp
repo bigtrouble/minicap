@@ -104,24 +104,7 @@ private:
   bool mStopped;
 };
 
-pthread_mutex_t mutex;
-static int
-pumpf(unsigned char* data, size_t length) {
-  pthread_mutex_lock(&mutex);
-  do {
-    int wrote = fwrite(data, 1, length, stdout);
-    fflush(stdout);
-    if (wrote < 0) {
-      return wrote;
-    }
 
-    data += wrote;
-    length -= wrote;
-  }
-  while (length > 0);
-  pthread_mutex_unlock(&mutex);
-  return 0;
-}
 
 static int
 putUInt32LE(unsigned char* data, int value) {
@@ -228,13 +211,6 @@ static void *thread_func(void *vptr_args)
 }
 
 
-static void *pong_func(void *args) {
-  unsigned char pong = 0x03;
-  while(1) {
-    sleep(3);
-    pumpf(&pong,1);
-  }
-}
 
 
 static middlecap_ctx *ctx = initMiddleCtx();
@@ -493,13 +469,6 @@ main(int argc, char* argv[]) {
   // =======================================================
   pthread_t thread;
   if (pthread_create(&thread, NULL, thread_func, NULL) != 0){
-      return EXIT_FAILURE;
-  }
-
-
-  // =======================================================
-  pthread_t pongthread;
-  if (pthread_create(&pongthread, NULL, pong_func, NULL) != 0){
       return EXIT_FAILURE;
   }
 

@@ -13,6 +13,27 @@
 #include <unistd.h>
 #include <libevdev.h>
 
+
+pthread_mutex_t mutex;
+static int
+pumpf(unsigned char* data, size_t length) {
+  pthread_mutex_lock(&mutex);
+  do {
+    int wrote = fwrite(data, 1, length, stdout);
+    fflush(stdout);
+    if (wrote < 0) {
+      return wrote;
+    }
+
+    data += wrote;
+    length -= wrote;
+  }
+  while (length > 0);
+  pthread_mutex_unlock(&mutex);
+  return 0;
+}
+
+
 static void parse_input(char* buffer, middlecap_ctx* ctx)
 {
   char* cursor;
@@ -53,6 +74,12 @@ static void parse_input(char* buffer, middlecap_ctx* ctx)
       break;
     case 'q': // modify jpg quality ( 0 ~ 100 )
       ctx->quality = atoi(cursor);
+      break;
+    case 'p': // ping
+      {
+        unsigned char pong = 0x03;
+        pumpf(&pong,1);
+      }
       break;
     default:
       break;

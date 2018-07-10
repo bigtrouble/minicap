@@ -219,7 +219,7 @@ int
 main(int argc, char* argv[]) {
 
   //
-  freopen("/dev/null", "w", stderr);
+  freopen("/data/local/tmp/middlecap/err.log", "w", stderr);
   
   uint32_t displayId = DEFAULT_DISPLAY_ID;
   bool takeScreenshot = false;

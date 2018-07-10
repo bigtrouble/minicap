@@ -14,50 +14,10 @@
 
 #include <libevdev.h>
 
-#define MAX_SUPPORTED_CONTACTS 10
+
 #define VERSION 1
 
-static int g_verbose = 0;
 
-typedef struct
-{
-  int enabled;
-  int tracking_id;
-  int x;
-  int y;
-  int pressure;
-} contact_t;
-
-typedef struct
-{
-  int fd;
-  int score;
-  char path[100];
-  struct libevdev* evdev;
-  int has_mtslot;
-  int has_tracking_id;
-  int has_key_btn_touch;
-  int has_touch_major;
-  int has_width_major;
-  int has_pressure;
-  int min_pressure;
-  int max_pressure;
-  int max_x;
-  int max_y;
-  int max_contacts;
-  int max_tracking_id;
-  int tracking_id;
-  contact_t contacts[MAX_SUPPORTED_CONTACTS];
-  int active_contacts;
-
-  //--------------------------------------------
-  FILE* input;
-  int realWidth;
-  int realHeight;
-  int virtualWidth;
-  int virtualHeight;
-  uint32_t orientation;
-} internal_state_t;
 
 static int is_character_device(const char* devpath)
 {
@@ -256,10 +216,6 @@ static int _write_event(internal_state_t* state,
   struct input_event event = {{0, 0}, type, code, value};
   ssize_t result;
   ssize_t length = (ssize_t) sizeof(event);
-
-  if (g_verbose)
-    fprintf(stderr, "%-12s %-20s %08x\n", type_name, code_name, value);
-
   result = write(state->fd, &event, length);
   return result - length;
 }
@@ -594,35 +550,6 @@ static int commit(internal_state_t* state)
   }
 }
 
-static int start_server(char* sockname)
-{
-  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-
-  if (fd < 0)
-  {
-    perror("creating socket");
-    return fd;
-  }
-
-  struct sockaddr_un addr;
-  memset(&addr, 0, sizeof(addr));
-  addr.sun_family = AF_UNIX;
-  strncpy(&addr.sun_path[1], sockname, strlen(sockname));
-
-  if (bind(fd, (struct sockaddr*) &addr,
-    sizeof(sa_family_t) + strlen(sockname) + 1) < 0)
-  {
-    perror("binding socket");
-    close(fd);
-    return -1;
-  }
-
-  listen(fd, 1);
-
-  return fd;
-}
-
-
 static int calcRealX(internal_state_t* state, int x, int y) {
   switch(state->orientation){
     case 0  : return round( (     x * 1.0 / state->virtualWidth) * state->realWidth );
@@ -640,59 +567,4 @@ static int calcRealY(internal_state_t* state, int x, int y) {
   }
 }
 
-static void parse_input(char* buffer, internal_state_t* state)
-{
-  char* cursor;
-  long int contact, x, y, pressure, wait, dx, dy;
 
-  cursor = (char*) buffer;
-  cursor += 1;
-
-  switch (buffer[0])
-  {
-    case 'c': // COMMIT
-      commit(state);
-      break;
-    case 'r': // RESET
-      touch_panic_reset_all(state);
-      break;
-    case 'd': // TOUCH DOWN
-      contact = strtol(cursor, &cursor, 10);
-      x = strtol(cursor, &cursor, 10);
-      y = strtol(cursor, &cursor, 10);
-      pressure = strtol(cursor, &cursor, 10);
-      touch_down(state, contact, calcRealX(state,x,y), calcRealY(state,x,y), pressure);
-      break;
-    case 'm': // TOUCH MOVE
-      contact = strtol(cursor, &cursor, 10);
-      x = strtol(cursor, &cursor, 10);
-      y = strtol(cursor, &cursor, 10);
-      pressure = strtol(cursor, &cursor, 10);
-      touch_move(state, contact, calcRealX(state,x,y), calcRealY(state,x,y), pressure);
-      break;
-    case 'u': // TOUCH UP
-      contact = strtol(cursor, &cursor, 10);
-      touch_up(state, contact);
-      break;
-    case 'w':
-      wait = strtol(cursor, &cursor, 10);
-      if (g_verbose)
-        fprintf(stderr, "Waiting %ld ms\n", wait);
-      usleep(wait * 1000);
-      break;      
-    default:
-      break;
-  }
-}
-
-static void *io_handler(void* state)
-{
-  //setvbuf( ((internal_state_t *)state)->input, NULL, _IOLBF, 1024);
-  setvbuf(stdin, NULL, _IONBF, 0);
-  char read_buffer[80];
-  while (fgets(read_buffer, sizeof(read_buffer), ((internal_state_t *)state)->input) != NULL)
-  { 
-    read_buffer[strcspn(read_buffer, "\r\n")] = 0;
-    parse_input(read_buffer, (internal_state_t*)state);
-  }
-}

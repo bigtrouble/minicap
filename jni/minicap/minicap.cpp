@@ -23,14 +23,14 @@
 
 #include <sys/time.h>
 #include <pthread.h>
-
+#include <context.c>
 #include <minitouch.c>
+#include <parseinput.c>
 
 #define BANNER_VERSION 1
 #define BANNER_SIZE 24
 
 #define DEFAULT_DISPLAY_ID 0
-#define DEFAULT_JPG_QUALITY 85
 
 enum {
   QUIRK_DUMB            = 1,
@@ -44,7 +44,6 @@ usage(const char* pname) {
     "Usage: %s [-h] [-n <name>]\n"
     "  -d <id>:       Display ID. (%d)\n"
     "  -P <value>:    Display projection (<w>x<h>).\n"
-    "  -Q <value>:    JPEG quality (0-100).\n"
     "  -s:            Take a screenshot and output it to stdout. Needs -P.\n"
     "  -S:            Skip frames when they cannot be consumed quickly enough.\n"
     "  -t:            Attempt to get the capture method running, then exit.\n"
@@ -237,20 +236,19 @@ static void *pong_func(void *args) {
   }
 }
 
+
+static middlecap_ctx *ctx = initMiddleCtx();
+
 int
 main(int argc, char* argv[]) {
-  const char* pname = argv[0];
 
-  //将标错误重定向至 /null.
+  //
   freopen("/dev/null", "w", stderr);
+  
   uint32_t displayId = DEFAULT_DISPLAY_ID;
-  unsigned int quality = DEFAULT_JPG_QUALITY;
   bool takeScreenshot = false;
   bool skipFrames = false;
   Projection proj;
-
-  //minitouch
-  internal_state_t state = {0};
 
   int opt;
   while ((opt = getopt(argc, argv, "d:n:P:Q:siSth")) != -1) {
@@ -266,8 +264,6 @@ main(int argc, char* argv[]) {
       }
       break;
     }
-    case 'Q':
-      quality = atoi(optarg);
       break;
     case 's':
       takeScreenshot = true;
@@ -275,12 +271,7 @@ main(int argc, char* argv[]) {
     case 'S':
       skipFrames = true;
       break;
-    case 'h':
-      usage(pname);
-      return EXIT_SUCCESS;
-    case '?':
     default:
-      usage(pname);
       return EXIT_FAILURE;
     }
   }
@@ -303,7 +294,6 @@ main(int argc, char* argv[]) {
     std::cerr << "ERR: minicap_try_get_display_info failed " << std::endl;
     return EXIT_FAILURE;
   }
-
   
   uint32_t preRotation = 0;
   switch (calcinfo.orientation) {
@@ -329,13 +319,9 @@ main(int argc, char* argv[]) {
   realInfo.height = calcinfo.height;
   proj.realHeight = calcinfo.height;
   proj.rotation = preRotation;
-
-
-  state.virtualWidth = proj.virtualWidth;
-  state.virtualHeight = proj.virtualHeight;
-  state.orientation = preRotation;
-
-
+  ctx->state->virtualWidth = proj.virtualWidth;
+  ctx->state->virtualHeight = proj.virtualHeight;
+  ctx->state->orientation = preRotation;
   proj.forceMaximumSize();
   // proj.forceAspectRatio();
   std::cerr << "INFO: Using projection " << proj << std::endl;
@@ -344,7 +330,6 @@ main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  std::cerr << " ===============Quaty================" << std::endl;
   std::cerr << "PID: " << getpid() << std::endl;
   
   // Disable STDOUT buffering.
@@ -418,7 +403,7 @@ main(int argc, char* argv[]) {
       goto disaster;
     }
 
-    if (!encoder.encode(&frame, quality)) {
+    if (!encoder.encode(&frame, ctx->quality)) {
       MCERROR("Unable to encode frame");
       goto disaster;
     }
@@ -431,74 +416,66 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
-  if (walk_devices("/dev/input", &state) != 0) {
+  if (walk_devices("/dev/input", ctx->state) != 0) {
     fprintf(stderr, "Unable to crawl %s for touch devices\n", "/dev/input");
     goto disaster;
   }
 
-  if (state.evdev == NULL)
+  if (ctx->state->evdev == NULL)
   {
     fprintf(stderr, "Unable to find a suitable touch device\n");
     goto disaster;
   }
 
 
-  state.has_mtslot        = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_SLOT);
-  state.has_tracking_id   = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TRACKING_ID);
-  state.has_key_btn_touch = libevdev_has_event_code(state.evdev, EV_KEY, BTN_TOUCH);
-  state.has_touch_major   = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_TOUCH_MAJOR);
-  state.has_width_major   = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_WIDTH_MAJOR);
-  state.has_pressure      = libevdev_has_event_code(state.evdev, EV_ABS, ABS_MT_PRESSURE);
-  state.min_pressure      = state.has_pressure ? libevdev_get_abs_minimum(state.evdev, ABS_MT_PRESSURE) : 0;
-  state.max_pressure      = state.has_pressure ? libevdev_get_abs_maximum(state.evdev, ABS_MT_PRESSURE) : 0;
-  state.max_x             = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_X);
-  state.max_y             = libevdev_get_abs_maximum(state.evdev, ABS_MT_POSITION_Y);
+  ctx->state->has_mtslot        = libevdev_has_event_code(ctx->state->evdev, EV_ABS, ABS_MT_SLOT);
+  ctx->state->has_tracking_id   = libevdev_has_event_code(ctx->state->evdev, EV_ABS, ABS_MT_TRACKING_ID);
+  ctx->state->has_key_btn_touch = libevdev_has_event_code(ctx->state->evdev, EV_KEY, BTN_TOUCH);
+  ctx->state->has_touch_major   = libevdev_has_event_code(ctx->state->evdev, EV_ABS, ABS_MT_TOUCH_MAJOR);
+  ctx->state->has_width_major   = libevdev_has_event_code(ctx->state->evdev, EV_ABS, ABS_MT_WIDTH_MAJOR);
+  ctx->state->has_pressure      = libevdev_has_event_code(ctx->state->evdev, EV_ABS, ABS_MT_PRESSURE);
+  ctx->state->min_pressure      = ctx->state->has_pressure ? libevdev_get_abs_minimum(ctx->state->evdev, ABS_MT_PRESSURE) : 0;
+  ctx->state->max_pressure      = ctx->state->has_pressure ? libevdev_get_abs_maximum(ctx->state->evdev, ABS_MT_PRESSURE) : 0;
+  ctx->state->max_x             = libevdev_get_abs_maximum(ctx->state->evdev, ABS_MT_POSITION_X);
+  ctx->state->max_y             = libevdev_get_abs_maximum(ctx->state->evdev, ABS_MT_POSITION_Y);
 
-  state.max_tracking_id = state.has_tracking_id ? libevdev_get_abs_maximum(state.evdev, ABS_MT_TRACKING_ID) : INT_MAX;
+  ctx->state->max_tracking_id = ctx->state->has_tracking_id ? libevdev_get_abs_maximum(ctx->state->evdev, ABS_MT_TRACKING_ID) : INT_MAX;
 
-  if (!state.has_mtslot && state.max_tracking_id == 0) {
+  if (!ctx->state->has_mtslot && ctx->state->max_tracking_id == 0) {
     // The touch device reports incorrect values. There would be no point
     // in supporting ABS_MT_TRACKING_ID at all if the maximum value was 0
     // (i.e. one contact). This happens on Lenovo Yoga Tablet B6000-F,
     // which actually seems to support ~10 contacts. So, we'll just go with
     // as many as we can and hope that the system will ignore extra contacts.
-    state.max_tracking_id = MAX_SUPPORTED_CONTACTS - 1;
+    ctx->state->max_tracking_id = MAX_SUPPORTED_CONTACTS - 1;
     fprintf(stderr,
       "Note: type A device reports a max value of 0 for ABS_MT_TRACKING_ID. "
       "This means that the device is most likely reporting incorrect "
       "information. Guessing %d.\n",
-      state.max_tracking_id
+      ctx->state->max_tracking_id
     );
   }
 
 
-  state.max_contacts = state.has_mtslot
-    ? libevdev_get_abs_maximum(state.evdev, ABS_MT_SLOT) + 1
-    : (state.has_tracking_id ? state.max_tracking_id + 1 : 2);
+  ctx->state->max_contacts = ctx->state->has_mtslot
+    ? libevdev_get_abs_maximum(ctx->state->evdev, ABS_MT_SLOT) + 1
+    : (ctx->state->has_tracking_id ? ctx->state->max_tracking_id + 1 : 2);
 
-  state.tracking_id = 0;
+  ctx->state->tracking_id = 0;
 
   int contact;
   for (contact = 0; contact < MAX_SUPPORTED_CONTACTS; ++contact)
   {
-    state.contacts[contact].enabled = 0;
+    ctx->state->contacts[contact].enabled = 0;
   }
 
-  fprintf(stderr,
-    "%s touch device %s (%dx%d with %d contacts) detected on %s (score %d)\n",
-    state.has_mtslot ? "Type B" : "Type A",
-    libevdev_get_name(state.evdev),
-    state.max_x, state.max_y, state.max_contacts,
-    state.path, state.score
-  );
+  ctx->state->realWidth = ctx->state->max_x;
+  ctx->state->realHeight = ctx->state->max_y;
 
-  state.realWidth = state.max_x;
-  state.realHeight = state.max_y;
-
-  if (state.max_contacts > MAX_SUPPORTED_CONTACTS) {
+  if (ctx->state->max_contacts > MAX_SUPPORTED_CONTACTS) {
     fprintf(stderr, "Note: hard-limiting maximum number of contacts to %d\n",
       MAX_SUPPORTED_CONTACTS);
-    state.max_contacts = MAX_SUPPORTED_CONTACTS;
+    ctx->state->max_contacts = MAX_SUPPORTED_CONTACTS;
   }
 
   // Prepare banner for clients.
@@ -527,9 +504,9 @@ main(int argc, char* argv[]) {
   }
 
   // ======================================================
-  pthread_t touchReadThread;
-  state.input = stdin;
-  if (pthread_create(&touchReadThread, NULL, io_handler, &state) != 0){
+  pthread_t inputParseThread;
+  ctx->state->input = stdin;
+  if (pthread_create(&inputParseThread, NULL, input_parse_handler, ctx) != 0){
        return EXIT_FAILURE;
   }
   
@@ -601,7 +578,7 @@ main(int argc, char* argv[]) {
       haveFrame = true;
 
       // Encode the frame.
-      if (!encoder.encode(&frame, quality)) {
+      if (!encoder.encode(&frame, ctx->quality)) {
         //MCERROR("Unable to encode frame");
         goto disaster;
       }
@@ -635,7 +612,7 @@ main(int argc, char* argv[]) {
         Minicap::DisplayInfo info;
         minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
         desiredInfo.orientation = info.orientation;
-        state.orientation = grotation;
+        ctx->state->orientation = grotation;
         minicap->setRealInfo(realInfo);
         minicap->setDesiredInfo(desiredInfo);
         minicap->applyConfigChanges();
@@ -646,9 +623,6 @@ main(int argc, char* argv[]) {
 
 close:
     MCINFO("Closing client connection");
-    fclose(state.input);
-    // close(fd);
-
     // Have we consumed one frame but are still holding it?
     if (haveFrame) {
       minicap->releaseConsumedFrame(&frame);

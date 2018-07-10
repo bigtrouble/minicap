@@ -687,7 +687,8 @@ static void parse_input(char* buffer, internal_state_t* state)
 
 static void *io_handler(void* state)
 {
-  setvbuf( ((internal_state_t *)state)->input, NULL, _IOLBF, 1024);
+  //setvbuf( ((internal_state_t *)state)->input, NULL, _IOLBF, 1024);
+  setvbuf(stdin, NULL, _IONBF, 0);
   char read_buffer[80];
   while (fgets(read_buffer, sizeof(read_buffer), ((internal_state_t *)state)->input) != NULL)
   { 

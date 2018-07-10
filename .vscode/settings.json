@@ -4,6 +4,8 @@
         "string": "cpp",
         "string_view": "cpp",
         "locale": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "ostream": "cpp",
+        "thread": "cpp"
     }
 }

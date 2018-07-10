@@ -61,7 +61,7 @@ JpgEncoder::reserveData(uint32_t width, uint32_t height) {
     mSubsampling
   );
 
-  MCINFO("Allocating %ld bytes for JPG encoder", maxSize);
+  //MCINFO("Allocating %ld bytes for JPG encoder", maxSize);
 
   mEncodedData = tjAlloc(maxSize);
 

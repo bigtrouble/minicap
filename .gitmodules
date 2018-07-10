@@ -6,3 +6,6 @@
 	path = jni/vendor/libevdev/source
 	url = git://anongit.freedesktop.org/libevdev
 
+[submodule "ffmpeg"]
+	path = jni/vendor/ffmpeg/source
+	url = https://git.ffmpeg.org/ffmpeg.git

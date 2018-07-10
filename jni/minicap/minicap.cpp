@@ -18,7 +18,6 @@
 
 #include "util/debug.h"
 #include "JpgEncoder.hpp"
-#include "SimpleServer.hpp"
 #include "Projection.hpp"
 
 #include <sys/time.h>
@@ -29,7 +28,6 @@
 #define BANNER_VERSION 1
 #define BANNER_SIZE 24
 
-#define DEFAULT_SOCKET_NAME "minicap"
 #define DEFAULT_DISPLAY_ID 0
 #define DEFAULT_JPG_QUALITY 85
 
@@ -44,14 +42,13 @@ usage(const char* pname) {
   fprintf(stderr,
     "Usage: %s [-h] [-n <name>]\n"
     "  -d <id>:       Display ID. (%d)\n"
-    "  -n <name>:     Change the name of the abtract unix domain socket. (%s)\n"
     "  -P <value>:    Display projection (<w>x<h>).\n"
     "  -Q <value>:    JPEG quality (0-100).\n"
     "  -s:            Take a screenshot and output it to stdout. Needs -P.\n"
     "  -S:            Skip frames when they cannot be consumed quickly enough.\n"
     "  -t:            Attempt to get the capture method running, then exit.\n"
     "  -h:            Show help.\n",
-    pname, DEFAULT_DISPLAY_ID, DEFAULT_SOCKET_NAME
+    pname, DEFAULT_DISPLAY_ID
   );
 }
 
@@ -108,29 +105,10 @@ private:
 };
 
 static int
-pumps(int fd, unsigned char* data, size_t length) {
+pumpf(unsigned char* data, size_t length) {
   do {
-    // Make sure that we don't generate a SIGPIPE even if the socket doesn't
-    // exist anymore. We'll still get an EPIPE which is perfect.
-    int wrote = send(fd, data, length, MSG_NOSIGNAL);
-
-    if (wrote < 0) {
-      return wrote;
-    }
-
-    data += wrote;
-    length -= wrote;
-  }
-  while (length > 0);
-
-  return 0;
-}
-
-static int
-pumpf(int fd, unsigned char* data, size_t length) {
-  do {
-    int wrote = write(fd, data, length);
-
+    int wrote = fwrite(data, 1, length, stdout);
+    fflush(stdout);
     if (wrote < 0) {
       return wrote;
     }
@@ -245,7 +223,9 @@ static void *thread_func(void *vptr_args)
 int
 main(int argc, char* argv[]) {
   const char* pname = argv[0];
-  const char* sockname = DEFAULT_SOCKET_NAME;
+
+  //将标错误重定向至 /null.
+  freopen("/dev/null", "w", stderr);
   uint32_t displayId = DEFAULT_DISPLAY_ID;
   unsigned int quality = DEFAULT_JPG_QUALITY;
   bool takeScreenshot = false;
@@ -260,9 +240,6 @@ main(int argc, char* argv[]) {
     switch (opt) {
     case 'd':
       displayId = atoi(optarg);
-      break;
-    case 'n':
-      sockname = optarg;
       break;
     case 'P': {
       Projection::Parser parser;
@@ -351,7 +328,9 @@ main(int argc, char* argv[]) {
   std::cerr << "PID: " << getpid() << std::endl;
   
   // Disable STDOUT buffering.
-  setbuf(stdout, NULL);
+
+  char *buf = (char*) malloc(1024*1024*16);
+  setvbuf(stdout, buf, _IOFBF, 1024*1024*16);
 
   // Figure out desired display size.
   desiredInfo.width = proj.virtualWidth;
@@ -364,9 +343,6 @@ main(int argc, char* argv[]) {
   JpgEncoder encoder(8, 0);
   Minicap::Frame frame;
   bool haveFrame = false;
-
-  // Server config.
-  SimpleServer server;
 
   // Set up minicap.
   minicap = minicap_create(displayId);
@@ -427,19 +403,13 @@ main(int argc, char* argv[]) {
       goto disaster;
     }
 
-    if (pumpf(STDOUT_FILENO, encoder.getEncodedData(), encoder.getEncodedSize()) < 0) {
+    if (pumpf(encoder.getEncodedData(), encoder.getEncodedSize()) < 0) {
       MCERROR("Unable to output encoded frame data");
       goto disaster;
     }
 
     return EXIT_SUCCESS;
   }
-
-  if (!server.start(sockname)) {
-    MCERROR("Unable to start server on namespace '%s'", sockname);
-    goto disaster;
-  }
-
 
   if (walk_devices("/dev/input", &state) != 0) {
     fprintf(stderr, "Unable to crawl %s for touch devices\n", "/dev/input");
@@ -529,25 +499,19 @@ main(int argc, char* argv[]) {
       return EXIT_FAILURE;
   }
   // ======================================================
-
-  int fd;
-  
-  // FILE* output;
   pthread_t touchReadThread;
-  while (!gWaiter.isStopped() && (fd = server.accept()) > 0) {
-    MCINFO("New client connection");
+  state.input = stdin;
+  if (pthread_create(&touchReadThread, NULL, io_handler, &state) != 0){
+       return EXIT_FAILURE;
+  }
+  
 
-    if (pumps(fd, banner, BANNER_SIZE) < 0) {
-      close(fd);
-      continue;
-    }
+    pumpf((unsigned char*)"MIDDLECAP-FETCH-START\n", strlen("MIDDLECAP-FETCH-START\n"));
 
-    state.input = fdopen(fd, "r");
-    if (pthread_create(&touchReadThread, NULL, io_handler, &state) != 0){
-      fclose(state.input);
-      close(fd);
-      continue;
+    if (pumpf(banner, BANNER_SIZE) < 0) {
+      return EXIT_FAILURE;;
     }
+    
 
     int pending, err;
     while (!gWaiter.isStopped() && (pending = gWaiter.waitForFrame()) > 0) {
@@ -561,11 +525,11 @@ main(int argc, char* argv[]) {
         while (--pending >= 1) {
           if ((err = minicap->consumePendingFrame(&frame)) != 0) {
             if (err == -EINTR) {
-              MCINFO("Frame consumption interrupted by EINTR");
+              //MCINFO("Frame consumption interrupted by EINTR");
               goto close;
             }
             else {
-              MCERROR("Unable to skip pending frame");
+              //MCERROR("Unable to skip pending frame");
               goto disaster;
             }
           }
@@ -575,22 +539,22 @@ main(int argc, char* argv[]) {
       }
 
       if( NULL == (&frame)) {
-        MCINFO(" invalid frame...  ");
+        //MCINFO(" invalid frame...  ");
         continue;
       }
 
       if ((err = minicap->consumePendingFrame(&frame)) != 0) {
         if(err == -22){
-            MCINFO(" -22  ");
+            //MCINFO(" -22  ");
             minicap->releaseConsumedFrame(&frame);
             continue;
         }
         else if (err == -EINTR) {
-          MCINFO("Frame consumption interrupted by EINTR");
+          //MCINFO("Frame consumption interrupted by EINTR");
           goto close;
         }
         else {
-          MCERROR("Unable to consume pending frame");
+          //MCERROR("Unable to consume pending frame");
           goto disaster;
         }
       }
@@ -599,7 +563,7 @@ main(int argc, char* argv[]) {
 
       // Encode the frame.
       if (!encoder.encode(&frame, quality)) {
-        MCERROR("Unable to encode frame");
+        //MCERROR("Unable to encode frame");
         goto disaster;
       }
 
@@ -607,12 +571,11 @@ main(int argc, char* argv[]) {
       // about other clients.
       unsigned char* data = encoder.getEncodedData() - 8;
       size_t size = encoder.getEncodedSize();
-
       putUInt32LE(data, grotation);
       putUInt32LE(data + 4, size);
 
-      if (pumps(fd, data, size + 8) < 0) {
-        break;
+      if (pumpf(data, size + 8) < 0) {
+         break;
       }
 
       // This will call onFrameAvailable() on older devices, so we have
@@ -636,13 +599,12 @@ main(int argc, char* argv[]) {
 close:
     MCINFO("Closing client connection");
     fclose(state.input);
-    close(fd);
+    // close(fd);
 
     // Have we consumed one frame but are still holding it?
     if (haveFrame) {
       minicap->releaseConsumedFrame(&frame);
     }
-  }
 
   minicap_free(minicap);
 

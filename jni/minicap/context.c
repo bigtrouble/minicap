@@ -45,6 +45,9 @@ typedef struct
 typedef struct
 {
   unsigned int quality;
+  Minicap::DisplayInfo *preDisplayInfo;
+  Minicap::DisplayInfo *currDisplayInfo;
+  int isApplyRotation;
   internal_state_t *state;
 
 } middlecap_ctx;
@@ -53,6 +56,9 @@ typedef struct
 static middlecap_ctx* initMiddleCtx() {
   middlecap_ctx* ctx = (middlecap_ctx*) malloc(sizeof(middlecap_ctx));
   ctx->quality = DEFAULT_JPG_QUALITY;
+  ctx->preDisplayInfo = NULL;
+  ctx->currDisplayInfo = NULL;
+  ctx->isApplyRotation = 0; 
   ctx->state = (internal_state_t*) malloc(sizeof(internal_state_t));
   *(ctx->state) = {0};
   return ctx;

@@ -158,22 +158,7 @@ try_get_framebuffer_display_info(uint32_t displayId, Minicap::DisplayInfo* info)
 
 static FrameWaiter gWaiter;
 
-static void
-signal_handler(int signum) {
-  switch (signum) {
-  case SIGINT:
-    MCINFO("Received SIGINT, stopping");
-    gWaiter.stop();
-    break;
-  case SIGTERM:
-    MCINFO("Received SIGTERM, stopping");
-    gWaiter.stop();
-    break;
-  default:
-    abort();
-    break;
-  }
-}
+
 
 static int pthread_flag = 1;
 static int grotation = 0;
@@ -182,31 +167,37 @@ static Minicap::DisplayInfo realInfo;
 static Minicap::DisplayInfo desiredInfo;
 static Minicap* minicap;
 
-static void *thread_func(void *vptr_args)
-{
+static int getRotation(Minicap::DisplayInfo *info) {
+  switch (info->orientation) {
+        case Minicap::ORIENTATION_0:   return 0;
+        case Minicap::ORIENTATION_90:  return 90;
+        case Minicap::ORIENTATION_180: return 180;
+        case Minicap::ORIENTATION_270: return 270;
+  }
+  return 0;
+}
+
+
+static Minicap::DisplayInfo *getDisplayInfo() {
+  Minicap::DisplayInfo *info = (Minicap::DisplayInfo*) malloc(sizeof(Minicap::DisplayInfo));
+  minicap_try_get_display_info(DEFAULT_DISPLAY_ID, info);
+  return info;
+}
+
+static void *thread_func(void *args) {
+
+    middlecap_ctx *ctx = (middlecap_ctx *) args;
     do{
 
       timeval delay;
       delay.tv_sec = 0;
       delay.tv_usec = 300 * 1000; // 300 ms
       select(0, NULL, NULL, NULL, &delay);
-
-      Minicap::DisplayInfo info;
-      minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
-      switch (info.orientation) {
-        case Minicap::ORIENTATION_0:
-          grotation = 0;
-          break;
-        case Minicap::ORIENTATION_90:
-          grotation = 90;
-          break;
-        case Minicap::ORIENTATION_180:
-          grotation = 180;
-          break;
-        case Minicap::ORIENTATION_270:
-          grotation = 270;
-          break;
-      }
+      free(ctx->preDisplayInfo);
+      ctx->preDisplayInfo = ctx->currDisplayInfo;
+      ctx->currDisplayInfo = getDisplayInfo();
+      ctx->isApplyRotation = 0;
+      
     } while(pthread_flag);
 }
 
@@ -252,52 +243,24 @@ main(int argc, char* argv[]) {
     }
   }
 
-  // Set up signal handler.
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_handler = signal_handler;
-  sigemptyset(&sa.sa_mask);
-  sigaction(SIGTERM, &sa, NULL);
-  sigaction(SIGINT, &sa, NULL);
 
   // Start Android's thread pool so that it will be able to serve our requests.
   minicap_start_thread_pool();
 
 
 
-  Minicap::DisplayInfo calcinfo;
-  if (minicap_try_get_display_info(displayId, &calcinfo) != 0) {
-    std::cerr << "ERR: minicap_try_get_display_info failed " << std::endl;
-    return EXIT_FAILURE;
-  }
-  
-  uint32_t preRotation = 0;
-  switch (calcinfo.orientation) {
-    case Minicap::ORIENTATION_0:
-      preRotation = 0;
-      break;
-    case Minicap::ORIENTATION_90:
-      preRotation = 90;
-      break;
-    case Minicap::ORIENTATION_180:
-      preRotation = 180;
-      break;
-    case Minicap::ORIENTATION_270:
-      preRotation = 270;
-      break;
-    }
-
-
+  ctx->preDisplayInfo = getDisplayInfo();
+  ctx->currDisplayInfo = getDisplayInfo();
 
   // Set real display size.
-  realInfo.width = calcinfo.width;
-  proj.realWidth = calcinfo.width;
-  realInfo.height = calcinfo.height;
-  proj.realHeight = calcinfo.height;
-  proj.rotation = preRotation;
+  realInfo.width = ctx->currDisplayInfo->width;
+  proj.realWidth = ctx->currDisplayInfo->width;
+  realInfo.height = ctx->currDisplayInfo->height;
+  proj.realHeight = ctx->currDisplayInfo->height;
+  proj.rotation = getRotation(ctx->currDisplayInfo);
   ctx->state->virtualWidth = proj.virtualWidth;
   ctx->state->virtualHeight = proj.virtualHeight;
-  ctx->state->orientation = preRotation;
+  ctx->state->orientation = getRotation(ctx->currDisplayInfo);
   proj.forceMaximumSize();
   // proj.forceAspectRatio();
   std::cerr << "INFO: Using projection " << proj << std::endl;
@@ -316,7 +279,7 @@ main(int argc, char* argv[]) {
   // Figure out desired display size.
   desiredInfo.width = proj.virtualWidth;
   desiredInfo.height = proj.virtualHeight;
-  desiredInfo.orientation = calcinfo.orientation;
+  desiredInfo.orientation = ctx->currDisplayInfo->orientation;
 
 
   // Leave a 5-byte padding to the encoder so that we can inject the flag & size
@@ -468,7 +431,7 @@ main(int argc, char* argv[]) {
 
   // =======================================================
   pthread_t thread;
-  if (pthread_create(&thread, NULL, thread_func, NULL) != 0){
+  if (pthread_create(&thread, NULL, thread_func, ctx) != 0){
       return EXIT_FAILURE;
   }
 
@@ -491,10 +454,9 @@ main(int argc, char* argv[]) {
     {
       unsigned char *rdatainit = (unsigned char*) malloc(5);
       putUInt1LE(rdatainit, 0x02);
-      putUInt32LE(rdatainit + 1, preRotation);
+      putUInt32LE(rdatainit + 1,  getRotation(ctx->currDisplayInfo));
       pumpf(rdatainit, 5);
       free(rdatainit);
-      grotation = preRotation;
     }
     
 
@@ -557,36 +519,32 @@ main(int argc, char* argv[]) {
       unsigned char* data = encoder.getEncodedData() - 5;
       size_t size = encoder.getEncodedSize();
 
-      if (grotation != preRotation) {
-        unsigned char* rdata = (unsigned char*)malloc(5);
-        putUInt1LE(rdata, 0x02);
-        putUInt32LE(rdata + 1, grotation);
-        pumpf(rdata, 5);
-        free(rdata);
-      }
-
+      // push frame
       putUInt1LE(data, 0x01);
       putUInt32LE(data + 1, size);
-
-      if (pumpf(data, size + 5) < 0) {
-         break;
-      }
+      pumpf(data, size + 5);
 
       // This will call onFrameAvailable() on older devices, so we have
       // to do it here or the loop will stop.
       minicap->releaseConsumedFrame(&frame);
       haveFrame = false;
 
-      if (grotation != preRotation) {
-        Minicap::DisplayInfo info;
-        minicap_try_get_display_info(DEFAULT_DISPLAY_ID, &info);
-        desiredInfo.orientation = info.orientation;
-        ctx->state->orientation = grotation;
+      if (getRotation(ctx->preDisplayInfo) != getRotation(ctx->currDisplayInfo) && ctx->isApplyRotation == 0 ) {
+
+
+        unsigned char* rdata = (unsigned char*)malloc(5);
+        putUInt1LE(rdata, 0x02);
+        putUInt32LE(rdata + 1, getRotation(ctx->currDisplayInfo));
+        pumpf(rdata, 5);
+        free(rdata);
+
+        desiredInfo.orientation = ctx->currDisplayInfo->orientation;
+        ctx->state->orientation = getRotation(ctx->currDisplayInfo);
         minicap->setRealInfo(realInfo);
         minicap->setDesiredInfo(desiredInfo);
         minicap->applyConfigChanges();
 
-        preRotation = grotation;
+        ctx->isApplyRotation = 1;
       }
   }
 

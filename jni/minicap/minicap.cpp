@@ -26,6 +26,7 @@
 #include <context.c>
 #include <minitouch.c>
 #include <parseinput.c>
+#include <termios.h>
 
 #define BANNER_VERSION 1
 #define BANNER_SIZE 24
@@ -211,6 +212,21 @@ main(int argc, char* argv[]) {
 
   //
   freopen("/data/local/tmp/middlecap/err.log", "w", stderr);
+
+  struct termios flags;
+  tcgetattr(fileno(stdin), &flags);
+  flags.c_lflag &= ~ECHO;
+  flags.c_lflag &= ~ICANON;
+  flags.c_lflag &= ~ISIG;
+  tcsetattr(fileno(stdin), TCSANOW , &flags );
+
+  tcgetattr(fileno(stdout), &flags);
+  flags.c_oflag &= ~OPOST;
+  flags.c_oflag &= ~ONLCR;
+  flags.c_oflag &= ~OCRNL;
+  flags.c_oflag &= ~ONLRET;
+  tcsetattr(fileno(stdout), TCSANOW , &flags );
+
   
   uint32_t displayId = DEFAULT_DISPLAY_ID;
   bool takeScreenshot = false;

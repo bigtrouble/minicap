@@ -215,17 +215,21 @@ main(int argc, char* argv[]) {
 
   struct termios flags;
   tcgetattr(fileno(stdin), &flags);
-  flags.c_lflag &= ~ECHO;
-  flags.c_lflag &= ~ICANON;
-  flags.c_lflag &= ~ISIG;
+  flags.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
+  flags.c_oflag &= ~OPOST;
+  flags.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+  flags.c_cflag &= ~(CSIZE|PARENB);
+  flags.c_cflag |= CS8;
   tcsetattr(fileno(stdin), TCSANOW , &flags );
 
   tcgetattr(fileno(stdout), &flags);
+  flags.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
   flags.c_oflag &= ~OPOST;
-  flags.c_oflag &= ~ONLCR;
-  flags.c_oflag &= ~OCRNL;
-  flags.c_oflag &= ~ONLRET;
+  flags.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+  flags.c_cflag &= ~(CSIZE|PARENB);
+  flags.c_cflag |= CS8;
   tcsetattr(fileno(stdout), TCSANOW , &flags );
+  setbuf(stdout, NULL);
 
   
   uint32_t displayId = DEFAULT_DISPLAY_ID;

@@ -20,15 +20,15 @@ pumpf(unsigned char* data, size_t length) {
   pthread_mutex_lock(&mutex);
   do {
     int wrote = fwrite(data, 1, length, stdout);
-    fflush(stdout);
     if (wrote < 0) {
+      pthread_mutex_unlock(&mutex);
       return wrote;
     }
-
     data += wrote;
     length -= wrote;
   }
   while (length > 0);
+  fflush(stdout);
   pthread_mutex_unlock(&mutex);
   return 0;
 }

@@ -15,10 +15,13 @@
 
 
 pthread_mutex_t mutex;
+long long idx = 0;
 static int
-pumpf(unsigned char* data, size_t length) {
+pumpf(unsigned char* data, size_t length, unsigned char type) {
   pthread_mutex_lock(&mutex);
   do {
+    fprintf(stdout, "%s%10lld","FR9F", (++idx));
+    fwrite(&type, 1, 1, stdout);
     int wrote = fwrite(data, 1, length, stdout);
     if (wrote < 0) {
       pthread_mutex_unlock(&mutex);
@@ -78,7 +81,7 @@ static void parse_input(char* buffer, middlecap_ctx* ctx)
     case 'p': // ping
       {
         unsigned char pong = 0x03;
-        pumpf(&pong,1);
+        pumpf(&pong,1, 0x03);
       }
       break;
     default:
@@ -91,7 +94,7 @@ static void *input_parse_handler(void* state)
   middlecap_ctx *ctx = (middlecap_ctx *)state;
 
   //setvbuf( ((internal_state_t *)state)->input, NULL, _IOLBF, 1024);
-  setvbuf(stdin, NULL, _IONBF, 0);
+  //setvbuf(stdin, NULL, _IONBF, 0);
   char read_buffer[80];
   while (fgets(read_buffer, sizeof(read_buffer), ctx->state->input) != NULL)
   { 

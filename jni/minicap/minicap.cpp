@@ -367,10 +367,10 @@ main(int argc, char* argv[]) {
       goto disaster;
     }
 
-    if (pumpf(encoder.getEncodedData(), encoder.getEncodedSize()) < 0) {
-      MCERROR("Unable to output encoded frame data");
-      goto disaster;
-    }
+    // if (pumpf(encoder.getEncodedData(), encoder.getEncodedSize()) < 0) {
+    //   MCERROR("Unable to output encoded frame data");
+    //   goto disaster;
+    // }
 
     return EXIT_SUCCESS;
   }
@@ -463,19 +463,19 @@ main(int argc, char* argv[]) {
   }
   
 
-    pumpf((unsigned char*)"MIDDLECAP-FETCH-START\n", strlen("MIDDLECAP-FETCH-START\n"));
+  //pumpf((unsigned char*)"MIDDLECAP-FETCH-START\n", strlen("MIDDLECAP-FETCH-START\n"));
 
-    if (pumpf(banner, BANNER_SIZE) < 0) {
+    if (pumpf(banner, BANNER_SIZE, 'b') < 0) {
       return EXIT_FAILURE;;
     }
     
 
     //send init rotation
     {
-      unsigned char *rdatainit = (unsigned char*) malloc(5);
-      putUInt1LE(rdatainit, 0x02);
-      putUInt32LE(rdatainit + 1,  getRotation(ctx->currDisplayInfo));
-      pumpf(rdatainit, 5);
+      unsigned char *rdatainit = (unsigned char*) malloc(4);
+      //putUInt1LE(rdatainit, 0x02);
+      putUInt32LE(rdatainit,  getRotation(ctx->currDisplayInfo));
+      pumpf(rdatainit, 4 , 0x02);
       free(rdatainit);
     }
     
@@ -542,7 +542,7 @@ main(int argc, char* argv[]) {
       // push frame
       putUInt1LE(data, 0x01);
       putUInt32LE(data + 1, size);
-      pumpf(data, size + 5);
+      pumpf(data, size + 5, 0x01);
 
       // This will call onFrameAvailable() on older devices, so we have
       // to do it here or the loop will stop.
@@ -552,10 +552,10 @@ main(int argc, char* argv[]) {
       if (getRotation(ctx->preDisplayInfo) != getRotation(ctx->currDisplayInfo) && ctx->isApplyRotation == 0 ) {
 
 
-        unsigned char* rdata = (unsigned char*)malloc(5);
-        putUInt1LE(rdata, 0x02);
-        putUInt32LE(rdata + 1, getRotation(ctx->currDisplayInfo));
-        pumpf(rdata, 5);
+        unsigned char* rdata = (unsigned char*)malloc(4);
+        // putUInt1LE(rdata, 0x02);
+        putUInt32LE(rdata, getRotation(ctx->currDisplayInfo));
+        pumpf(rdata, 4, 0x02);
         free(rdata);
 
         desiredInfo.orientation = ctx->currDisplayInfo->orientation;

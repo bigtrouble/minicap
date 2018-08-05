@@ -367,9 +367,15 @@ main(int argc, char* argv[]) {
       goto disaster;
     }
 
-    fwrite(encoder.getEncodedData(), 1, encoder.getEncodedSize(), stdout);
+    unsigned char * dat = encoder.getEncodedData();
+    int size = encoder.getEncodedSize();
+    do {
+      int wrote = fwrite(dat, 1, size, stdout);
+      dat += wrote;
+      size -= wrote;
+    }
+    while(size>0);
     fflush(stdout);
-
     return EXIT_SUCCESS;
   }
 

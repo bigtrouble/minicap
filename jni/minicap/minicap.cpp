@@ -367,10 +367,8 @@ main(int argc, char* argv[]) {
       goto disaster;
     }
 
-    // if (pumpf(encoder.getEncodedData(), encoder.getEncodedSize()) < 0) {
-    //   MCERROR("Unable to output encoded frame data");
-    //   goto disaster;
-    // }
+    fwrite(encoder.getEncodedData(), 1, encoder.getEncodedSize(), stdout);
+    fflush(stdout);
 
     return EXIT_SUCCESS;
   }
